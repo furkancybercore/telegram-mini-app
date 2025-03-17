@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rock Paper Scissors - Telegram Mini App</title>
+    <link rel="stylesheet" href="../src/styles.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="auth-section" class="section">
+            <h1>Welcome to Rock Paper Scissors</h1>
+            <p>Please login with Telegram to continue</p>
+            <button id="login-button" class="button">Login with Telegram</button>
+        </div>
+
+        <div id="game-section" class="section hidden">
+            <h1>Rock Paper Scissors</h1>
+            <div id="user-info">
+                <img id="user-photo" src="" alt="User Photo">
+                <p id="user-name">Welcome, User!</p>
+            </div>
+            
+            <div id="game-container">
+                <h2>Make your choice:</h2>
+                <div class="choices">
+                    <button class="choice-button" data-choice="rock">✊ Rock</button>
+                    <button class="choice-button" data-choice="paper">✋ Paper</button>
+                    <button class="choice-button" data-choice="scissors">✌️ Scissors</button>
+                </div>
+                
+                <div id="result-container" class="hidden">
+                    <h2>Result:</h2>
+                    <div class="result-display">
+                        <div class="player-choice">
+                            <h3>You chose:</h3>
+                            <p id="player-choice"></p>
+                        </div>
+                        <div class="computer-choice">
+                            <h3>Computer chose:</h3>
+                            <p id="computer-choice"></p>
+                        </div>
+                    </div>
+                    <h2 id="result-text"></h2>
+                    <button id="play-again" class="button">Play Again</button>
+                </div>
+            </div>
+            
+            <div id="stats-container">
+                <h2>Your Stats:</h2>
+                <div class="stats">
+                    <p>Total Games: <span id="total-games">0</span></p>
+                    <p>Wins: <span id="wins">0</span></p>
+                    <p>Losses: <span id="losses">0</span></p>
+                    <p>Draws: <span id="draws">0</span></p>
+                    <p>Win Rate: <span id="win-rate">0%</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../src/app.js"></script>
+</body>
+</html> 
