@@ -2,7 +2,8 @@
 
 A simple Rock-Paper-Scissors game built as a Telegram Mini App. This project demonstrates how to create a game that can be embedded directly into Telegram chats.
 
-![RPC Game Screenshot](https://via.placeholder.com/600x400?text=Rock+Paper+Scissors+Game)
+![RPC Game Screenshot](![image](https://github.com/user-attachments/assets/5b937a0b-9690-483f-b478-b0b74d5d9ac8))
+
 
 ## 🌟 Project Overview for Beginners
 
