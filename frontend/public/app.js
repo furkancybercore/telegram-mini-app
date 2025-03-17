@@ -260,77 +260,144 @@ function switchToFallbackApi() {
     initializeApp();
 }
 
-// Event Listeners - Auth
-loginButton.addEventListener('click', handleLogin);
+/**
+ * ==========================================
+ * EVENT LISTENERS
+ * ==========================================
+ * This section sets up all the event listeners for user interactions.
+ * They are all initialized when the DOM content is fully loaded.
+ */
 
-// Event Listeners - Game
-choiceButtons.forEach(button => {
-    button.addEventListener('click', () => handleChoice(button.dataset.choice));
+// Initialize the app when the DOM is fully loaded
+window.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM fully loaded, initializing app...');
+    
+    // STEP 1: Set up the UI elements
+    // ------------------------------
+    // Set the bot username in the footer
+    const botUsernameFooter = document.querySelector('.bot-username-footer');
+    if (botUsernameFooter) {
+        botUsernameFooter.textContent = `@${botUsername}`;
+    }
+    
+    // STEP 2: Initialize core features
+    // ------------------------------
+    // Check API health to ensure backend is available
+    checkApiHealth();
+    
+    // Update bot username display throughout the app
+    updateBotUsername(botUsername);
+    
+    // STEP 3: Add event listeners
+    // ------------------------------
+    // Authentication
+    loginButton.addEventListener('click', handleLogin);
+    
+    // Game controls
+    choiceButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const choice = this.dataset.choice;
+            handleChoice(choice);
+        });
+    });
+    playAgainButton.addEventListener('click', resetGame);
+    
+    // Profile controls
+    themeButtons.forEach(button => {
+        button.addEventListener('click', () => handleThemeChange(button.id));
+    });
+    saveProfileButton.addEventListener('click', saveProfile);
+    logoutButton.addEventListener('click', handleLogout);
+    deleteAccountButton.addEventListener('click', handleDeleteAccount);
+    
+    // Navigation controls
+    navItems.forEach(item => {
+        item.addEventListener('click', () => navigateTo(item.dataset.target));
+    });
+    
+    console.log('App initialization complete');
 });
-playAgainButton.addEventListener('click', resetGame);
 
-// Event Listeners - Profile
-themeButtons.forEach(button => {
-    button.addEventListener('click', () => handleThemeChange(button.id));
-});
-saveProfileButton.addEventListener('click', saveProfile);
-logoutButton.addEventListener('click', handleLogout);
-deleteAccountButton.addEventListener('click', handleDeleteAccount);
+/**
+ * ========================================
+ * AUTHENTICATION FUNCTIONS
+ * ========================================
+ */
 
-// Event Listeners - Navigation
-navItems.forEach(item => {
-    item.addEventListener('click', () => navigateTo(item.dataset.target));
-});
-
-// Functions - Authentication
+/**
+ * Handles the login button click
+ * 
+ * This function is the starting point of the authentication flow.
+ * It determines whether we're in a Telegram environment or in demo mode, 
+ * then proceeds with the appropriate authentication method.
+ */
 function handleLogin() {
-    // Show loading and hide error
+    console.log('Login process started');
+    
+    // Step 1: Update UI to show we're processing
+    // ------------------------------------------
+    // Show loading spinner
     loadingElement.classList.remove('hidden');
+    // Hide any previous error messages
     authErrorElement.classList.add('hidden');
+    // Hide bot info section
     telegramBotInfo.classList.add('hidden');
+    // Disable the login button to prevent multiple clicks
     loginButton.disabled = true;
 
-    // Check if demo mode is enabled
+    // Step 2: Check for demo mode
+    // ------------------------------------------
+    // Demo mode is useful for testing without a real Telegram connection
     if (demoMode) {
-        console.log('Demo mode is enabled. Using mock data.');
+        console.log('Demo mode is enabled. Using mock data for authentication.');
+        // Create fake user data for demo purposes
         const mockData = {
-            id: '123456789',
-            first_name: 'Demo',
-            last_name: 'User',
-            username: 'demouser',
-            photo_url: 'https://via.placeholder.com/150',
-            auth_date: Math.floor(Date.now() / 1000),
-            hash: 'mock_hash'
+            id: '123456789',           // User ID in Telegram
+            first_name: 'Demo',        // User's first name
+            last_name: 'User',         // User's last name
+            username: 'demouser',      // User's Telegram username
+            photo_url: 'https://via.placeholder.com/150', // Profile photo URL
+            auth_date: Math.floor(Date.now() / 1000),     // Current timestamp
+            hash: 'mock_hash'          // Special hash that signals demo mode to backend
         };
         
+        // Simulate network delay for realistic testing
         setTimeout(() => {
-            // Always stringify the mockData object
+            // Convert the mock data to JSON string format
             const jsonData = JSON.stringify(mockData);
-            console.log('Mock data (stringified):', jsonData);
+            console.log('Using mock data for authentication:', jsonData.substring(0, 50) + '...');
+            // Proceed with authentication using the mock data
             authenticateWithTelegram(jsonData);
-        }, 1000); // Simulate network delay
+        }, 1000); // Wait 1 second to simulate network
         return;
     }
-
-    // Check if running within Telegram environment
+    
+    // Step 3: Verify Telegram environment
+    // ------------------------------------------
+    // Check if we're running within the Telegram app
     if (!window.Telegram || !window.Telegram.WebApp) {
+        console.log('Not running in Telegram environment');
         showTelegramRequiredError();
         return;
     }
 
-    // If we're in Telegram Mini App, use initData
+    // Step 4: Get authentication data
+    // ------------------------------------------
+    // If we're in Telegram Mini App, use the data Telegram provides
     if (tg.initData && tg.initData.trim() !== '') {
-        console.log('Using Telegram initData for authentication');
-        // The initData is already a URL-encoded string, so we use it directly
+        console.log('Telegram environment detected with valid initData');
+        // The initData is already a URL-encoded string with user info
         authenticateWithTelegram(tg.initData);
     } else {
-        // For cases where the app is opened in Telegram but without proper initData
+        // We're in Telegram but without proper data
+        console.log('In Telegram but missing initData');
         if (window.Telegram && window.Telegram.WebApp) {
             showTelegramBotError();
         } else {
-            // For testing in browser
-            console.log('Not in Telegram Mini App. Using mock data.');
+            // For browser testing outside Telegram
+            console.log('Not in Telegram Mini App. Offering demo mode option.');
             
+            // Create mock data similar to what Telegram would provide
             const mockData = {
                 id: '123456789',
                 first_name: 'Test',
@@ -341,7 +408,7 @@ function handleLogin() {
                 hash: 'mock_hash'
             };
             
-            // Show option to continue in demo mode
+            // Show error with option to continue in demo mode
             showLoginError(`Not launched from Telegram. <button id="demo-mode-btn" class="demo-button">Continue in Demo Mode</button>`, true);
             telegramBotInfo.classList.remove('hidden');
             
@@ -398,21 +465,42 @@ function showLoginError(message, isHtml = false) {
     authErrorElement.classList.remove('hidden');
 }
 
+/**
+ * Authenticates the user with Telegram data
+ * 
+ * This function takes the data provided by Telegram, processes it,
+ * and sends it to our backend for verification. If successful,
+ * it creates or updates the user account and returns a token.
+ * 
+ * @param {string} initData - The data from Telegram containing user information
+ *                            This can be JSON or URL-encoded format
+ * @returns {Promise<void>} - Resolves when authentication is complete
+ */
 async function authenticateWithTelegram(initData) {
     try {
-        console.log('Authenticating with API:', API_URL);
+        console.log('Starting authentication process with backend API');
         
-        // Log initData info for debugging (safely)
-        if (initData && typeof initData === 'string') {
+        // STEP 1: Validate the input data format
+        // --------------------------------------
+        if (!initData) {
+            throw new Error('No authentication data provided');
+        }
+        
+        // Log a safe preview of the data (don't log entire data for security)
+        if (typeof initData === 'string') {
             const preview = initData.length > 20 ? initData.substring(0, 20) + '...' : initData;
-            console.log('initData preview:', preview, 'length:', initData.length);
+            console.log('Authentication data received, length:', initData.length);
+            console.log('Data preview:', preview);
         } else {
-            console.error('Invalid initData format:', typeof initData);
+            console.error('Invalid data format received:', typeof initData);
             throw new Error('Invalid authentication data format');
         }
         
-        // Check for browser compatibility issues
+        // STEP 2: Check for browser compatibility
+        // --------------------------------------
+        // Modern browsers support fetch API for HTTP requests
         if (typeof fetch !== 'function') {
+            console.error('Fetch API not supported by this browser');
             throw new Error('Your browser does not support modern features required by this app');
         }
         
@@ -584,7 +672,12 @@ async function authenticateWithTelegram(initData) {
         showAuthenticatedUI();
         updateAllUserInfo();
         showSection('game-section');
-        fetchGameStats();
+        
+        // Load game stats after authentication
+        console.log('Loading game stats after authentication...');
+        setTimeout(() => {
+            fetchGameStats();
+        }, 500); // Small delay to ensure UI is ready
     } catch (error) {
         console.error('Authentication error:', error);
         
@@ -644,36 +737,143 @@ function updateAllUserInfo() {
     emailInput.value = userData.email || '';
 }
 
-// Functions - Game Play
+/**
+ * Fetches game statistics from the backend API
+ * This function retrieves the user's game statistics (wins, losses, draws, etc.)
+ * and updates the UI accordingly. It includes error handling and retry logic
+ * if the DOM elements aren't ready yet.
+ */
 async function fetchGameStats() {
     try {
+        // Check if token exists
+        if (!token) {
+            console.error('No authentication token available');
+            return; // Exit early if no token
+        }
+        
+        // Ensure DOM elements are available - check once before making the API call
+        const statsElementsReady = 
+            totalGamesElement && 
+            winsElement && 
+            lossesElement && 
+            drawsElement && 
+            winRateElement;
+            
+        if (!statsElementsReady) {
+            console.error('Stats DOM elements not ready yet, retrying in 1s');
+            // Retry after a short delay
+            setTimeout(fetchGameStats, 1000);
+            return;
+        }
+        
+        console.log('Fetching game stats from:', `${API_URL}/game/stats/`);
         const response = await fetch(`${API_URL}/game/stats/`, {
+            method: 'GET',
             headers: {
-                'Authorization': `Token ${token}`
+                'Authorization': `Token ${token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
             }
         });
 
         if (!response.ok) {
-            throw new Error('Failed to fetch game stats');
+            const errorText = await response.text();
+            console.error(`Failed to fetch game stats. Status: ${response.status}`, errorText);
+            throw new Error(`Failed to fetch game stats: ${response.statusText}`);
         }
 
-        const stats = await response.json();
-        updateStatsDisplay(stats);
+        const responseText = await response.text();
+        if (!responseText || !responseText.trim()) {
+            console.error('Empty response from stats endpoint');
+            return;
+        }
+        
+        try {
+            const stats = JSON.parse(responseText);
+            console.log('Game stats received:', stats);
+            updateStatsDisplay(stats);
+        } catch (parseError) {
+            console.error('Error parsing stats JSON:', parseError, responseText.substring(0, 100));
+        }
     } catch (error) {
         console.error('Error fetching game stats:', error);
+        // Provide a basic fallback to ensure the UI is always populated
+        updateStatsDisplay({
+            total_games: 0,
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            win_percentage: 0
+        });
     }
 }
 
+/**
+ * Updates the UI with game statistics
+ * @param {Object} stats - The statistics object containing total_games, wins, losses, draws, and win_percentage
+ */
 function updateStatsDisplay(stats) {
-    totalGamesElement.textContent = stats.total_games || 0;
-    winsElement.textContent = stats.wins || 0;
-    lossesElement.textContent = stats.losses || 0;
-    drawsElement.textContent = stats.draws || 0;
-    winRateElement.textContent = `${stats.win_percentage || 0}%`;
+    if (!stats) {
+        console.error('No stats data provided to updateStatsDisplay');
+        stats = {
+            total_games: 0,
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            win_percentage: 0
+        };
+    }
+    
+    // Safely get values with fallbacks
+    const totalGames = stats.total_games !== undefined ? stats.total_games : 0;
+    const wins = stats.wins !== undefined ? stats.wins : 0;
+    const losses = stats.losses !== undefined ? stats.losses : 0;
+    const draws = stats.draws !== undefined ? stats.draws : 0;
+    
+    // Calculate win rate if not provided
+    let winRate = stats.win_percentage;
+    if (winRate === undefined && totalGames > 0) {
+        winRate = ((wins / totalGames) * 100).toFixed(1);
+    } else if (winRate === undefined || totalGames === 0) {
+        winRate = 0;
+    }
+    
+    // Double-check DOM elements before updating
+    if (!totalGamesElement || !winsElement || !lossesElement || !drawsElement || !winRateElement) {
+        console.error('DOM elements for stats display are not available');
+        return;
+    }
+    
+    // Update DOM elements
+    totalGamesElement.textContent = totalGames;
+    winsElement.textContent = wins;
+    lossesElement.textContent = losses;
+    drawsElement.textContent = draws;
+    winRateElement.textContent = `${winRate}%`;
+    
+    console.log('Stats display updated:', { totalGames, wins, losses, draws, winRate });
 }
 
+/**
+ * Handles the user's choice (rock, paper, or scissors)
+ * Sends the choice to the backend, processes the result, and updates the UI
+ * @param {string} choice - The user's choice ('rock', 'paper', or 'scissors')
+ */
 async function handleChoice(choice) {
     try {
+        if (!token) {
+            console.error('No authentication token available');
+            alert('Please log in to play the game');
+            return;
+        }
+        
+        // Show loading indicator or disable buttons if needed
+        document.querySelectorAll('.choice-button').forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+        });
+        
+        console.log(`Playing game with choice: ${choice}`);
         const response = await fetch(`${API_URL}/game/play/`, {
             method: 'POST',
             headers: {
@@ -683,19 +883,51 @@ async function handleChoice(choice) {
             body: JSON.stringify({ user_choice: choice })
         });
 
+        // Re-enable buttons regardless of outcome
+        document.querySelectorAll('.choice-button').forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        });
+
         if (!response.ok) {
-            throw new Error('Game play failed');
+            const errorText = await response.text();
+            console.error(`Game play failed. Status: ${response.status}`, errorText);
+            throw new Error(`Failed to play game: ${response.statusText}`);
         }
 
-        const gameResult = await response.json();
-        displayResult(gameResult);
-        fetchGameStats(); // Update stats after game
+        const responseText = await response.text();
+        if (!responseText || !responseText.trim()) {
+            console.error('Empty response from game play endpoint');
+            alert('There was a problem processing your move. Please try again.');
+            return;
+        }
+        
+        try {
+            const gameResult = JSON.parse(responseText);
+            console.log('Game result:', gameResult);
+            
+            // Update the UI to show the result
+            displayResult(gameResult);
+            
+            // Fetch updated game stats
+            setTimeout(() => {
+                fetchGameStats();
+            }, 500);
+            
+        } catch (parseError) {
+            console.error('Error parsing game result JSON:', parseError);
+            alert('There was a problem processing the game result. Please try again.');
+        }
     } catch (error) {
-        console.error('Error playing game:', error);
-        alert('Failed to play the game. Please try again.');
+        console.error('Game play error:', error);
+        alert('There was a problem playing the game. Please try again.');
     }
 }
 
+/**
+ * Displays the result of a game
+ * @param {Object} gameResult - The game result object containing user_choice, computer_choice, and result
+ */
 function displayResult(gameResult) {
     // Show result container
     resultContainer.classList.remove('hidden');
@@ -703,23 +935,36 @@ function displayResult(gameResult) {
     // Hide choice buttons
     document.querySelector('.choices-container').classList.add('hidden');
     
-    // Update result display
+    // Update player and computer choices with emojis
     playerChoiceElement.textContent = getEmojiForChoice(gameResult.user_choice);
     computerChoiceElement.textContent = getEmojiForChoice(gameResult.computer_choice);
     
-    // Set result text
+    // Update result text with appropriate styling
+    resultText.className = 'result-text'; // Reset classes
+    
     if (gameResult.result === 'win') {
         resultText.textContent = 'You Win! 🎉';
-        resultText.style.color = 'var(--win-color)';
+        resultText.classList.add('win-text');
     } else if (gameResult.result === 'lose') {
         resultText.textContent = 'You Lose! 😢';
-        resultText.style.color = 'var(--lose-color)';
+        resultText.classList.add('lose-text');
     } else {
         resultText.textContent = 'It\'s a Draw! 🤝';
-        resultText.style.color = 'var(--draw-color)';
+        resultText.classList.add('draw-text');
     }
+    
+    // Show play again button
+    playAgainButton.classList.remove('hidden');
+    
+    // Scroll to result
+    resultContainer.scrollIntoView({ behavior: 'smooth' });
 }
 
+/**
+ * Returns an emoji representation of a game choice
+ * @param {string} choice - The choice ('rock', 'paper', or 'scissors')
+ * @returns {string} The emoji representing the choice
+ */
 function getEmojiForChoice(choice) {
     switch (choice) {
         case 'rock': return '✊';
@@ -729,9 +974,23 @@ function getEmojiForChoice(choice) {
     }
 }
 
+/**
+ * Resets the game UI to allow the user to play again
+ */
 function resetGame() {
+    // Hide result container
     resultContainer.classList.add('hidden');
+    
+    // Show choice buttons
     document.querySelector('.choices-container').classList.remove('hidden');
+    
+    // Hide play again button
+    playAgainButton.classList.add('hidden');
+    
+    // Reset result text
+    resultText.textContent = '';
+    playerChoiceElement.textContent = '';
+    computerChoiceElement.textContent = '';
 }
 
 // Functions - Profile
@@ -877,19 +1136,4 @@ function checkTelegramWebApp() {
 function handleTelegramAuthError(message) {
     showLoginError(message, true);
     telegramBotInfo.classList.remove('hidden');
-}
-
-// Initialize the app
-window.addEventListener('DOMContentLoaded', function() {
-    // Set the bot username in all places where it might be displayed
-    const botUsernameFooter = document.querySelector('.bot-username-footer');
-    if (botUsernameFooter) {
-        botUsernameFooter.textContent = `@${botUsername}`;
-    }
-    
-    // Check API health before proceeding
-    checkApiHealth();
-    
-    // Set the bot username from localStorage or the default
-    updateBotUsername(botUsername);
-}); 
+} 
