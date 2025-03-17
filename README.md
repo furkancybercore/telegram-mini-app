@@ -259,25 +259,814 @@ telegram-mini-app/
 
 The data flow between Telegram, the frontend, and the backend is as follows:
 
-1. **User Authentication**:
-   - User opens the Telegram Mini App
-   - Telegram provides user data via `window.Telegram.WebApp.initData`
-   - Frontend sends this data to the backend for validation
-   - Backend validates the data using the bot token and creates/updates the user
-   - Backend returns a token for subsequent API calls
+### 1. User Authentication and Registration
 
-2. **Game Play**:
-   - User selects a choice (rock, paper, or scissors)
-   - Frontend sends the choice to the backend
-   - Backend generates a random choice for the computer
-   - Backend determines the winner and updates the game statistics
-   - Backend returns the result to the frontend
-   - Frontend displays the result to the user
+When a user opens your Telegram Mini App, the following process occurs automatically:
 
-3. **Game Statistics**:
-   - Frontend requests game statistics from the backend
-   - Backend returns the user's game statistics
-   - Frontend displays the statistics to the user
+#### Frontend (JavaScript)
+```javascript
+// Get the Telegram Web App instance
+const tg = window.Telegram.WebApp;
+
+// Expand the Web App to take the full screen
+tg.expand();
+
+// Get the initData from Telegram (contains user info and authentication data)
+const initData = tg.initData;
+
+// Send initData to backend for validation
+fetch('https://your-backend-url/api/auth/telegram/', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ initData }),
+})
+  .then(response => response.json())
+  .then(data => {
+    // Store the authentication token for future API calls
+    localStorage.setItem('auth_token', data.token);
+    
+    // Store user information
+    localStorage.setItem('user', JSON.stringify(data.user));
+    
+    // Update UI with user information
+    document.getElementById('username').textContent = 
+      data.user.first_name + (data.user.last_name ? ' ' + data.user.last_name : '');
+    
+    // Show the game interface instead of login screen
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('game-interface').style.display = 'block';
+  })
+  .catch(error => {
+    console.error('Authentication failed:', error);
+    // Show error message to user
+  });
+```
+
+#### Backend (Django)
+```python
+# views.py in telegram_auth app
+import hashlib
+import hmac
+import json
+from django.conf import settings
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import TelegramUser
+
+class TelegramAuthView(APIView):
+    def post(self, request):
+        # Get the initData from the request
+        init_data = request.data.get('initData')
+        
+        # Validate the data using Telegram's validation method
+        # See: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+        user_data = self.validate_telegram_data(init_data)
+        
+        if not user_data:
+            return Response({"error": "Invalid authentication data"}, 
+                           status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create or update the user in the database
+        user, created = TelegramUser.objects.update_or_create(
+            telegram_id=user_data['id'],
+            defaults={
+                'username': user_data.get('username', ''),
+                'first_name': user_data.get('first_name', ''),
+                'last_name': user_data.get('last_name', ''),
+                'language_code': user_data.get('language_code', 'en'),
+                'is_premium': user_data.get('is_premium', False),
+            }
+        )
+        
+        # Generate an authentication token
+        token = self.generate_auth_token(user)
+        
+        # Return the user data and token
+        return Response({
+            "user": {
+                "id": user.telegram_id,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "language_code": user.language_code,
+                "is_premium": user.is_premium
+            },
+            "token": token,
+            "is_new_user": created
+        }, status=status.HTTP_200_OK)
+    
+    def validate_telegram_data(self, init_data):
+        """
+        Validate the data received from Telegram Mini App
+        
+        See: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+        """
+        try:
+            # Parse the init_data
+            data_parts = init_data.split('&')
+            hash_value = None
+            data_check_string = []
+            
+            # Extract hash and data check string
+            for part in data_parts:
+                if part.startswith('hash='):
+                    hash_value = part[5:]
+                else:
+                    data_check_string.append(part)
+            
+            # Sort the data check string
+            data_check_string = '\n'.join(sorted(data_check_string))
+            
+            # Generate the secret key
+            secret_key = hmac.new(
+                key=b"WebAppData",
+                msg=settings.TELEGRAM_BOT_TOKEN.encode(),
+                digestmod=hashlib.sha256
+            ).digest()
+            
+            # Verify the hash
+            calculated_hash = hmac.new(
+                key=secret_key,
+                msg=data_check_string.encode(),
+                digestmod=hashlib.sha256
+            ).hexdigest()
+            
+            # Return the user data if valid
+            if calculated_hash == hash_value:
+                # Extract user data
+                for part in data_check_string.split('\n'):
+                    if part.startswith('user='):
+                        user_json = part[5:]
+                        return json.loads(user_json)
+            
+            return None
+        except Exception as e:
+            print(f"Validation error: {str(e)}")
+            return None
+    
+    def generate_auth_token(self, user):
+        # Generate a token for the user (in a real app, use JWT or another token method)
+        import uuid
+        token = str(uuid.uuid4())
+        user.auth_token = token
+        user.save()
+        return token
+```
+
+### 2. Game Play
+
+Once authenticated, the user can interact with the game:
+
+#### Frontend (JavaScript)
+```javascript
+// Game choice buttons
+document.querySelectorAll('.choice-button').forEach(button => {
+  button.addEventListener('click', function() {
+    const playerChoice = this.dataset.choice; // 'rock', 'paper', or 'scissors'
+    playGame(playerChoice);
+  });
+});
+
+// Function to play a game
+function playGame(playerChoice) {
+  // Show loading state
+  document.getElementById('result-area').innerHTML = '<div class="spinner"></div>';
+  
+  // Get the authentication token from localStorage
+  const token = localStorage.getItem('auth_token');
+  
+  // Send the player's choice to the backend
+  fetch('https://your-backend-url/api/game/play/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Token ${token}` // Include auth token in header
+    },
+    body: JSON.stringify({
+      choice: playerChoice
+    })
+  })
+    .then(response => response.json())
+    .then(data => {
+      // Update the UI with the game result
+      document.getElementById('player-choice').textContent = 
+        getEmojiForChoice(data.player_choice);
+      document.getElementById('computer-choice').textContent = 
+        getEmojiForChoice(data.computer_choice);
+      
+      // Display the result
+      const resultText = data.result === 'win' ? 'You win!' : 
+                         data.result === 'lose' ? 'You lose!' : 'It\'s a draw!';
+      document.getElementById('result-text').textContent = resultText;
+      
+      // Add appropriate CSS class for styling
+      const resultContainer = document.getElementById('result-container');
+      resultContainer.className = 'result-container ' + data.result;
+      
+      // Update the game statistics
+      updateStats();
+      
+      // Show Telegram MainButton for playing again
+      window.Telegram.WebApp.MainButton.setText('Play Again');
+      window.Telegram.WebApp.MainButton.show();
+    })
+    .catch(error => {
+      console.error('Game play error:', error);
+      document.getElementById('result-area').innerHTML = 
+        '<p class="error">Something went wrong. Please try again.</p>';
+    });
+}
+
+// Helper function to convert choice to emoji
+function getEmojiForChoice(choice) {
+  switch(choice) {
+    case 'rock': return '✊';
+    case 'paper': return '✋';
+    case 'scissors': return '✌️';
+    default: return '❓';
+  }
+}
+```
+
+#### Backend (Django)
+```python
+# views.py in game app
+import random
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from .models import Game
+from .serializers import GameSerializer
+
+class GamePlayView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        # Get the player's choice from the request
+        player_choice = request.data.get('choice')
+        
+        # Validate the choice
+        if player_choice not in ['rock', 'paper', 'scissors']:
+            return Response({
+                "error": "Invalid choice. Must be 'rock', 'paper', or 'scissors'."
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Generate a random choice for the computer
+        choices = ['rock', 'paper', 'scissors']
+        computer_choice = random.choice(choices)
+        
+        # Determine the winner
+        if player_choice == computer_choice:
+            result = 'draw'
+        elif (player_choice == 'rock' and computer_choice == 'scissors') or \
+             (player_choice == 'paper' and computer_choice == 'rock') or \
+             (player_choice == 'scissors' and computer_choice == 'paper'):
+            result = 'win'
+        else:
+            result = 'lose'
+        
+        # Save the game result in the database
+        game = Game.objects.create(
+            user=request.user,
+            player_choice=player_choice,
+            computer_choice=computer_choice,
+            result=result
+        )
+        
+        # Return the game result
+        return Response({
+            "id": game.id,
+            "player_choice": player_choice,
+            "computer_choice": computer_choice,
+            "result": result,
+            "timestamp": game.created_at
+        }, status=status.HTTP_200_OK)
+```
+
+### 3. Game Statistics
+
+The user can view their game statistics:
+
+#### Frontend (JavaScript)
+```javascript
+// Function to update game statistics
+function updateStats() {
+  // Get the authentication token
+  const token = localStorage.getItem('auth_token');
+  
+  // Fetch game statistics from the backend
+  fetch('https://your-backend-url/api/game/stats/', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Token ${token}`
+    }
+  })
+    .then(response => response.json())
+    .then(stats => {
+      // Update the statistics in the UI
+      document.getElementById('total-games').textContent = stats.total_games;
+      document.getElementById('wins').textContent = stats.wins;
+      document.getElementById('losses').textContent = stats.losses;
+      document.getElementById('draws').textContent = stats.draws;
+      
+      // Calculate and display win rate
+      const winRate = stats.total_games > 0 
+        ? ((stats.wins / stats.total_games) * 100).toFixed(1) + '%' 
+        : '0%';
+      document.getElementById('win-rate').textContent = winRate;
+    })
+    .catch(error => {
+      console.error('Error fetching game statistics:', error);
+    });
+}
+```
+
+#### Backend (Django)
+```python
+# views.py in game app (continued)
+class GameStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        # Get the authenticated user from the request
+        user = request.user
+        
+        # Get all games for this user
+        user_games = Game.objects.filter(user=user)
+        total_games = user_games.count()
+        
+        # Count wins, losses, and draws
+        wins = user_games.filter(result='win').count()
+        losses = user_games.filter(result='lose').count()
+        draws = user_games.filter(result='draw').count()
+        
+        # Calculate win rate
+        win_rate = (wins / total_games) * 100 if total_games > 0 else 0
+        
+        # Return the statistics
+        return Response({
+            'total_games': total_games,
+            'wins': wins,
+            'losses': losses,
+            'draws': draws,
+            'win_rate': round(win_rate, 1)
+        }, status=status.HTTP_200_OK)
+```
+
+## Telegram Mini App Integration
+
+The frontend integrates with Telegram using the [Telegram Web App API](https://core.telegram.org/bots/webapps). Here's a comprehensive guide to the integration:
+
+### 1. Setup and Initialization
+
+First, include the Telegram Web App script in your HTML file:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rock Paper Scissors</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Include Telegram Web App script -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div id="login-screen">
+    <h1>Welcome to Rock Paper Scissors</h1>
+    <p>Please login with Telegram to continue</p>
+    <button id="login-button">Login with Telegram</button>
+    <div id="loading" style="display: none;">
+      <div class="spinner"></div>
+      <p>Authenticating...</p>
+    </div>
+    <p id="error-message" class="error"></p>
+  </div>
+  
+  <div id="game-interface" style="display: none;">
+    <h1>Rock Paper Scissors</h1>
+    <h2>Welcome, <span id="username">User</span>!</h2>
+    
+    <h3>Make your choice:</h3>
+    <div class="choices">
+      <button class="choice-button" data-choice="rock">✊ Rock</button>
+      <button class="choice-button" data-choice="paper">✋ Paper</button>
+      <button class="choice-button" data-choice="scissors">✌️ Scissors</button>
+    </div>
+    
+    <div class="result-container" id="result-container">
+      <h3>Result:</h3>
+      <div id="result-area">
+        <div class="choices-display">
+          <div>
+            <h4>You chose:</h4>
+            <div class="choice-display" id="player-choice"></div>
+          </div>
+          <div>
+            <h4>Computer chose:</h4>
+            <div class="choice-display" id="computer-choice"></div>
+          </div>
+        </div>
+        <h3 id="result-text"></h3>
+      </div>
+    </div>
+    
+    <div class="stats-container">
+      <h3>Your Stats:</h3>
+      <div class="stats-row">
+        <span class="stats-label">Total Games:</span>
+        <span class="stats-value" id="total-games">0</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Wins:</span>
+        <span class="stats-value" id="wins">0</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Losses:</span>
+        <span class="stats-value" id="losses">0</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Draws:</span>
+        <span class="stats-value" id="draws">0</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Win Rate:</span>
+        <span class="stats-value" id="win-rate">0%</span>
+      </div>
+    </div>
+  </div>
+  
+  <script src="app.js"></script>
+</body>
+</html>
+```
+
+### 2. Advanced Telegram Integration
+
+The app.js file initializes the Telegram Web App and handles user interactions:
+
+```javascript
+// Initialize the Telegram Web App
+document.addEventListener('DOMContentLoaded', function() {
+  // Get the Telegram Web App instance
+  const tg = window.Telegram.WebApp;
+  
+  if (!tg) {
+    console.error("Telegram WebApp is not available");
+    document.body.innerHTML = "<h1>Error: This app must be opened from Telegram</h1>";
+    return;
+  }
+  
+  // Expand the Web App to take the full screen
+  tg.expand();
+  
+  // Apply Telegram theme colors to the app
+  applyTelegramTheme();
+  
+  // Initialize the authentication process
+  initAuth();
+  
+  // Set up Telegram-specific UI elements
+  setupTelegramUI();
+});
+
+// Apply Telegram theme to the app
+function applyTelegramTheme() {
+  const tg = window.Telegram.WebApp;
+  const themeParams = tg.themeParams;
+  
+  // Apply theme colors to CSS variables
+  document.documentElement.style.setProperty('--tg-theme-bg-color', themeParams.bg_color);
+  document.documentElement.style.setProperty('--tg-theme-text-color', themeParams.text_color);
+  document.documentElement.style.setProperty('--tg-theme-hint-color', themeParams.hint_color);
+  document.documentElement.style.setProperty('--tg-theme-link-color', themeParams.link_color);
+  document.documentElement.style.setProperty('--tg-theme-button-color', themeParams.button_color);
+  document.documentElement.style.setProperty('--tg-theme-button-text-color', themeParams.button_text_color);
+}
+
+// Set up Telegram-specific UI elements
+function setupTelegramUI() {
+  const tg = window.Telegram.WebApp;
+  
+  // Configure the Main Button
+  tg.MainButton.setParams({
+    text: 'Play Again',
+    color: tg.themeParams.button_color,
+    text_color: tg.themeParams.button_text_color,
+    is_visible: false
+  });
+  
+  // Handle Main Button click
+  tg.MainButton.onClick(function() {
+    // Reset the game UI
+    document.getElementById('player-choice').textContent = '';
+    document.getElementById('computer-choice').textContent = '';
+    document.getElementById('result-text').textContent = '';
+    document.getElementById('result-container').className = 'result-container';
+    
+    // Hide the Main Button
+    tg.MainButton.hide();
+  });
+  
+  // Set up the Back Button if needed
+  tg.BackButton.onClick(function() {
+    // Handle back button click (e.g., go back to main menu)
+    if (document.getElementById('game-history').style.display === 'block') {
+      document.getElementById('game-history').style.display = 'none';
+      document.getElementById('game-interface').style.display = 'block';
+      tg.BackButton.hide();
+    }
+  });
+  
+  // Check for CloudStorage API (available in newer versions)
+  if (tg.CloudStorage) {
+    // You can use Telegram's cloud storage to save user preferences
+    tg.CloudStorage.getItem('theme_preference', function(err, value) {
+      if (err) {
+        console.log('Error getting cloud data', err);
+        return;
+      }
+      
+      if (value) {
+        // Apply user's saved theme preference
+        console.log('User theme preference:', value);
+      }
+    });
+  }
+}
+
+// Handle haptic feedback for button presses
+function hapticFeedback(type) {
+  const tg = window.Telegram.WebApp;
+  if (tg.HapticFeedback) {
+    switch(type) {
+      case 'success':
+        tg.HapticFeedback.notificationOccurred('success');
+        break;
+      case 'error':
+        tg.HapticFeedback.notificationOccurred('error');
+        break;
+      case 'selection':
+        tg.HapticFeedback.selectionChanged();
+        break;
+      case 'impact':
+        tg.HapticFeedback.impactOccurred('medium');
+        break;
+    }
+  }
+}
+```
+
+### 3. Enhanced CSS for Telegram Integration
+
+Create a sleek, modern UI that adapts to Telegram's theme:
+
+```css
+/* Base styles with Telegram theming */
+:root {
+  /* Telegram theme variables - will be set by JavaScript */
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-text-color: #000000;
+  --tg-theme-hint-color: #999999;
+  --tg-theme-link-color: #2481cc;
+  --tg-theme-button-color: #2481cc;
+  --tg-theme-button-text-color: #ffffff;
+  
+  /* Game-specific colors */
+  --win-color: #4CAF50;
+  --lose-color: #F44336;
+  --draw-color: #FFC107;
+}
+
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--tg-theme-bg-color);
+  color: var(--tg-theme-text-color);
+  line-height: 1.6;
+  padding: 20px;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 {
+  margin-bottom: 15px;
+  text-align: center;
+  color: var(--tg-theme-text-color);
+}
+
+h1 {
+  font-size: 24px;
+  margin-top: 10px;
+}
+
+h2 {
+  font-size: 20px;
+  color: var(--tg-theme-link-color);
+}
+
+h3 {
+  font-size: 18px;
+}
+
+p {
+  margin-bottom: 15px;
+}
+
+button {
+  background-color: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: opacity 0.3s;
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  margin: 15px auto;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+button:active {
+  opacity: 0.7;
+}
+
+/* Game interface styles */
+.choices {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  max-width: 350px;
+  margin: 30px auto;
+}
+
+.choice-button {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  margin: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
+}
+
+.choice-button:hover {
+  transform: scale(1.05);
+}
+
+.choice-button:active {
+  transform: scale(0.95);
+}
+
+.result-container {
+  text-align: center;
+  margin: 30px auto;
+  padding: 20px;
+  border-radius: 12px;
+  background-color: rgba(0,0,0,0.03);
+  max-width: 400px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.result-container.win {
+  border: 2px solid var(--win-color);
+  background-color: rgba(76, 175, 80, 0.05);
+}
+
+.result-container.lose {
+  border: 2px solid var(--lose-color);
+  background-color: rgba(244, 67, 54, 0.05);
+}
+
+.result-container.draw {
+  border: 2px solid var(--draw-color);
+  background-color: rgba(255, 193, 7, 0.05);
+}
+
+.choices-display {
+  display: flex;
+  justify-content: space-around;
+  margin: 20px 0;
+}
+
+.choice-display {
+  font-size: 48px;
+  margin: 10px 0;
+  animation: bounce 0.5s;
+}
+
+#result-text {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 15px 0;
+}
+
+.result-container.win #result-text {
+  color: var(--win-color);
+}
+
+.result-container.lose #result-text {
+  color: var(--lose-color);
+}
+
+.result-container.draw #result-text {
+  color: var(--draw-color);
+}
+
+/* Statistics styles */
+.stats-container {
+  margin: 30px auto;
+  padding: 20px;
+  border-radius: 12px;
+  background-color: rgba(0,0,0,0.03);
+  max-width: 400px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.stats-row:last-child {
+  border-bottom: none;
+}
+
+.stats-label {
+  color: var(--tg-theme-hint-color);
+}
+
+.stats-value {
+  font-weight: bold;
+}
+
+/* Loading indicator */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0,0,0,0.1);
+  border-radius: 50%;
+  border-top-color: var(--tg-theme-button-color);
+  margin: 20px auto;
+  animation: spin 1s infinite linear;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Animations */
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-20px); }
+  60% { transform: translateY(-10px); }
+}
+
+.error {
+  color: var(--lose-color);
+  text-align: center;
+  margin: 10px 0;
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .choices {
+    max-width: 300px;
+  }
+  
+  .choice-button {
+    width: 80px;
+    height: 80px;
+    font-size: 28px;
+  }
+  
+  .choice-display {
+    font-size: 40px;
+  }
+}
+```
 
 ## API Endpoints
 
@@ -304,42 +1093,6 @@ The data flow between Telegram, the frontend, and the backend is as follows:
   - Response: List of games
 - `GET /api/game/stats/`: Get the user's game statistics
   - Response: Game statistics
-
-## Telegram Mini App Integration
-
-The frontend integrates with Telegram using the Telegram Web App API. The key integration points are:
-
-1. **Initialization**:
-   ```javascript
-   const tg = window.Telegram.WebApp;
-   tg.expand();
-   ```
-
-2. **Theme Adaptation**:
-   ```javascript
-   document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color);
-   document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color);
-   // ... more theme properties
-   ```
-
-3. **User Authentication**:
-   ```javascript
-   // Get user data from Telegram
-   const initData = tg.initData;
-   
-   // Send to backend for validation
-   fetch('/api/auth/telegram/', {
-     method: 'POST',
-     body: initData
-   });
-   ```
-
-4. **Back Button Handling**:
-   ```javascript
-   tg.BackButton.onClick(() => {
-     // Handle back button click
-   });
-   ```
 
 ## Testing
 
