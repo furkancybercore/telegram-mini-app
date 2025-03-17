@@ -148,4 +148,6 @@ REST_FRAMEWORK = {
 }
 
 # Telegram Bot settings (to be filled by user)
-TELEGRAM_BOT_TOKEN = '7944633759:AAGQCpHS2Vxaky9VHMtlmKGpSfcpgt1_Rew'
+# This should be the token for RPC_2025_bot
+# For local development, we'll skip validation so this doesn't need to be correct
+TELEGRAM_BOT_TOKEN = ''  # Empty for development to skip validation

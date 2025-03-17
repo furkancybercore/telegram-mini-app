@@ -129,6 +129,15 @@ telegram-mini-app/
 
 ### 4. Deploy Your Application (Free Methods)
 
+#### Current Deployment URLs
+
+Our application is currently deployed at these URLs:
+
+- **Frontend**: [https://5d8f-203-30-15-108.ngrok-free.app](https://5d8f-203-30-15-108.ngrok-free.app)
+- **Backend**: [https://a8b0-203-30-15-108.ngrok-free.app](https://a8b0-203-30-15-108.ngrok-free.app)
+
+These are temporary ngrok URLs for development and testing. For production, consider using the options below.
+
 #### For Development/Testing (Using ngrok)
 
 [ngrok](https://ngrok.com/) provides temporary public URLs for your local server:

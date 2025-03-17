@@ -4,62 +4,260 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rock Paper Scissors - Telegram Mini App</title>
-    <link rel="stylesheet" href="../src/styles.css">
+    <link rel="stylesheet" href="styles.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
-        <div id="auth-section" class="section">
-            <h1>Welcome to Rock Paper Scissors</h1>
-            <p>Please login with Telegram to continue</p>
-            <button id="login-button" class="button">Login with Telegram</button>
-        </div>
-
-        <div id="game-section" class="section hidden">
-            <h1>Rock Paper Scissors</h1>
-            <div id="user-info">
-                <img id="user-photo" src="" alt="User Photo">
-                <p id="user-name">Welcome, User!</p>
+        <!-- Navigation -->
+        <nav id="navbar" class="navbar hidden">
+            <div class="nav-item active" data-target="game-section">
+                <i class="fas fa-gamepad"></i>
+                <span>Game</span>
             </div>
+            <div class="nav-item" data-target="profile-section">
+                <i class="fas fa-user"></i>
+                <span>Profile</span>
+            </div>
+            <div class="nav-item" data-target="leaderboard-section">
+                <i class="fas fa-trophy"></i>
+                <span>Leaders</span>
+            </div>
+        </nav>
+
+        <!-- Authentication Section -->
+        <div id="auth-section" class="section">
+            <div class="logo-container">
+                <div class="logo-icon">✊✋✌️</div>
+            </div>
+            <h1>Rock Paper Scissors</h1>
+            <p class="subtitle">Challenge your luck in this classic game!</p>
+            <button id="login-button" class="button pulse-button">
+                <span class="button-icon">🔐</span>
+                Login with Telegram
+            </button>
+            <div id="loading" class="loading-container hidden">
+                <div class="spinner"></div>
+                <p>Connecting to Telegram...</p>
+            </div>
+            <p id="auth-error" class="error-message hidden"></p>
             
-            <div id="game-container">
-                <h2>Make your choice:</h2>
-                <div class="choices">
-                    <button class="choice-button" data-choice="rock">✊ Rock</button>
-                    <button class="choice-button" data-choice="paper">✋ Paper</button>
-                    <button class="choice-button" data-choice="scissors">✌️ Scissors</button>
+            <!-- Telegram Bot Info - Initially hidden, shown when needed -->
+            <div id="telegram-bot-info" class="telegram-bot-info hidden">
+                <p>Scan this QR code with your phone camera or Telegram app:</p>
+                <div class="qr-code-container">
+                    <!-- BOT_USERNAME is a placeholder that should be replaced with the actual bot username -->
+                    <img id="bot-qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://t.me/RPC_2025_bot" alt="Telegram Bot QR Code" class="qr-code">
                 </div>
+                <p>Or click this link to open in Telegram:</p>
+                <!-- BOT_USERNAME is a placeholder that should be replaced with the actual bot username -->
+                <a id="bot-telegram-link" href="https://t.me/RPC_2025_bot" class="telegram-link" target="_blank">
+                    <i class="fab fa-telegram"></i> Open @RPC_2025_bot in Telegram
+                </a>
+                <p class="bot-info-note">Note: If you're the developer, update the bot username in index.html.</p>
                 
-                <div id="result-container" class="hidden">
-                    <h2>Result:</h2>
-                    <div class="result-display">
-                        <div class="player-choice">
-                            <h3>You chose:</h3>
-                            <p id="player-choice"></p>
+                <!-- Developer Tools -->
+                <div class="dev-tools">
+                    <button id="show-dev-tools-btn" class="dev-tools-toggle">
+                        <i class="fas fa-wrench"></i> Developer Tools
+                    </button>
+                    <div id="dev-tools-panel" class="dev-tools-panel hidden">
+                        <h4>Bot Configuration</h4>
+                        <div class="form-group">
+                            <label for="bot-username">Bot Username:</label>
+                            <div class="input-with-btn">
+                                <input type="text" id="bot-username-input" placeholder="YourBotUsername">
+                                <button id="update-bot-btn">Update</button>
+                            </div>
                         </div>
-                        <div class="computer-choice">
-                            <h3>Computer chose:</h3>
-                            <p id="computer-choice"></p>
+                        <div class="form-group">
+                            <label for="api-url">API URL:</label>
+                            <div class="input-with-btn">
+                                <input type="text" id="api-url-input" placeholder="https://your-api-url.com/api">
+                                <button id="update-api-btn">Update</button>
+                            </div>
+                        </div>
+                        <div class="dev-actions">
+                            <button id="clear-storage-btn">Clear Storage</button>
+                            <button id="toggle-demo-mode-btn">Toggle Demo Mode</button>
                         </div>
                     </div>
-                    <h2 id="result-text"></h2>
-                    <button id="play-again" class="button">Play Again</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Section -->
+        <div id="game-section" class="section hidden">
+            <header class="game-header">
+                <h1>Rock Paper Scissors</h1>
+                <div id="user-info" class="user-info">
+                    <img id="user-photo" src="" alt="User Photo">
+                    <p id="user-name">Welcome!</p>
+                </div>
+            </header>
+            
+            <div id="game-container" class="game-container">
+                <h2 class="section-title">Make your choice:</h2>
+                <div class="choices-container">
+                    <button class="choice-button" data-choice="rock">
+                        <span class="choice-emoji">✊</span>
+                        <span class="choice-label">Rock</span>
+                    </button>
+                    <button class="choice-button" data-choice="paper">
+                        <span class="choice-emoji">✋</span>
+                        <span class="choice-label">Paper</span>
+                    </button>
+                    <button class="choice-button" data-choice="scissors">
+                        <span class="choice-emoji">✌️</span>
+                        <span class="choice-label">Scissors</span>
+                    </button>
+                </div>
+                
+                <div id="result-container" class="result-container hidden">
+                    <h2 class="section-title">Result:</h2>
+                    <div class="result-display">
+                        <div class="player-choice choice-display">
+                            <h3>You chose:</h3>
+                            <p id="player-choice" class="choice-emoji"></p>
+                        </div>
+                        <div class="computer-choice choice-display">
+                            <h3>Computer chose:</h3>
+                            <p id="computer-choice" class="choice-emoji"></p>
+                        </div>
+                    </div>
+                    <h2 id="result-text" class="result-text"></h2>
+                    <button id="play-again" class="button play-again-button">
+                        <span class="button-icon">🔄</span>
+                        Play Again
+                    </button>
                 </div>
             </div>
             
-            <div id="stats-container">
-                <h2>Your Stats:</h2>
-                <div class="stats">
-                    <p>Total Games: <span id="total-games">0</span></p>
-                    <p>Wins: <span id="wins">0</span></p>
-                    <p>Losses: <span id="losses">0</span></p>
-                    <p>Draws: <span id="draws">0</span></p>
-                    <p>Win Rate: <span id="win-rate">0%</span></p>
+            <div id="stats-container" class="stats-container">
+                <h2 class="section-title">Your Stats:</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-games">0</div>
+                        <div class="stat-label">Total Games</div>
+                    </div>
+                    <div class="stat-card win">
+                        <div class="stat-value" id="wins">0</div>
+                        <div class="stat-label">Wins</div>
+                    </div>
+                    <div class="stat-card lose">
+                        <div class="stat-value" id="losses">0</div>
+                        <div class="stat-label">Losses</div>
+                    </div>
+                    <div class="stat-card draw">
+                        <div class="stat-value" id="draws">0</div>
+                        <div class="stat-label">Draws</div>
+                    </div>
+                </div>
+                <div class="win-rate">
+                    <div class="win-rate-label">Win Rate:</div>
+                    <div class="win-rate-value"><span id="win-rate">0%</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Section -->
+        <div id="profile-section" class="section hidden">
+            <header class="section-header">
+                <h1>Your Profile</h1>
+            </header>
+            
+            <div class="profile-container">
+                <div class="profile-header">
+                    <div class="profile-avatar-container">
+                        <img id="profile-photo" src="" alt="Profile Photo">
+                        <div class="profile-photo-edit">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                    </div>
+                    <h2 id="profile-name">Loading...</h2>
+                    <p id="profile-username" class="profile-username">@username</p>
+                </div>
+                
+                <div class="profile-details">
+                    <h3 class="section-title">Your Information</h3>
+                    
+                    <div class="profile-form">
+                        <div class="form-group">
+                            <label for="display-name">Display Name</label>
+                            <input type="text" id="display-name" class="form-input" placeholder="Your display name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Email (optional)</label>
+                            <input type="email" id="email" class="form-input" placeholder="Your email address">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Theme Preference</label>
+                            <div class="theme-toggle">
+                                <button id="light-theme" class="theme-button active">
+                                    <i class="fas fa-sun"></i>
+                                    Light
+                                </button>
+                                <button id="dark-theme" class="theme-button">
+                                    <i class="fas fa-moon"></i>
+                                    Dark
+                                </button>
+                                <button id="system-theme" class="theme-button">
+                                    <i class="fas fa-laptop"></i>
+                                    System
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <button id="save-profile" class="button">
+                            <span class="button-icon">💾</span>
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="account-actions">
+                    <button id="logout-button" class="button warning-button">
+                        <span class="button-icon">🚪</span>
+                        Logout
+                    </button>
+                    <button id="delete-account" class="button danger-button">
+                        <span class="button-icon">⚠️</span>
+                        Delete Account
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard Section -->
+        <div id="leaderboard-section" class="section hidden">
+            <header class="section-header">
+                <h1>Leaderboard</h1>
+            </header>
+            
+            <div class="leaderboard-container">
+                <h2 class="section-title">Top Players</h2>
+                
+                <div class="leaderboard-filters">
+                    <button class="filter-button active" data-filter="global">Global</button>
+                    <button class="filter-button" data-filter="friends">Friends</button>
+                    <button class="filter-button" data-filter="weekly">Weekly</button>
+                </div>
+                
+                <div id="leaderboard-list" class="leaderboard-list">
+                    <div class="leaderboard-loading">
+                        <div class="spinner"></div>
+                        <p>Loading leaderboard...</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="../src/app.js"></script>
+    <div class="bot-username-footer">@RPC_2025_bot</div>
+    <script src="app.js"></script>
 </body>
 </html> 
