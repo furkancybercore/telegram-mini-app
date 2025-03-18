@@ -1,27 +1,22 @@
 """
 Django Views for Telegram Mini App Authentication API.
 
-This file contains function-based views handling API endpoints for Telegram user authentication and profile management.
-The views interact with the database models and use serializers to process request and response data.
+This file contains simple view functions for Telegram authentication.
 
 API Endpoints:
 - `POST /api/auth/telegram/` → Authenticates a user via Telegram data and returns user details with token.
 - `GET /api/auth/profile/` → Retrieves the authenticated user's profile information.
-- `PUT /api/auth/profile/` → Updates the authenticated user's profile information.
+- `PUT /api/auth/profile/update/` → Updates the authenticated user's profile information.
 """
-from django.shortcuts import render
 import hmac
 import hashlib
 import time
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import transaction
-from rest_framework import status, permissions
+from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.views import APIView
+from rest_framework.decorators import api_view
 from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .models import TelegramUser
 from .serializers import TelegramUserSerializer
@@ -29,20 +24,12 @@ from .serializers import TelegramUserSerializer
 def validate_telegram_data(data):
     """
     Validate data received from Telegram Mini App
-    
-    Args:
-        data (dict): The data received from Telegram Mini App
-        
-    Returns:
-        tuple: (is_valid, message) where is_valid is a boolean and message is a string
     """
-    # Check if we're in development mode with a mock hash
+    # For development mode with a mock hash
     if data.get('hash') == 'mock_hash':
-        print("Detected mock hash, skipping validation for development/demo mode")
         return True, "Mock data is valid"
     
     if not settings.TELEGRAM_BOT_TOKEN:
-        print("No bot token set, skipping validation")
         return True, "No bot token set, skipping validation"
     
     # Check if auth_date is fresh (not older than 24 hours)
@@ -72,101 +59,29 @@ def validate_telegram_data(data):
 
 # Telegram Authentication API
 @api_view(["POST"])
-@permission_classes([AllowAny])
-@transaction.atomic
 def telegram_auth(request):
-    """
-    Authenticate a user via Telegram data and return user details with token.
-    
-    Request Body:
-        - id (str): Telegram user ID
-        - hash (str): Telegram authentication hash
-        - auth_date (str): Authentication date as a timestamp
-        - first_name (str): User's first name
-        - last_name (str, optional): User's last name
-        - username (str, optional): User's Telegram username
-        - photo_url (str, optional): URL to user's profile photo
-        
-    Returns:
-        - 200 OK: User authenticated successfully, returns user details and token
-        - 400 Bad Request: Invalid request data or authentication failed
-    """
-    # Debug the request
-    print("Request Content-Type:", request.META.get('CONTENT_TYPE'))
-    print("Request Body Type:", type(request.body))
-    
-    if len(request.body) > 200:
-        print("Request Body (truncated):", request.body[:200], "...")
-    else:
-        print("Request Body:", request.body)
-    
+    """Authenticate a user via Telegram data and return user details with token."""
     # Get data from request
     telegram_data = request.data
-    print("Parsed Data Type:", type(telegram_data))
-    
-    if isinstance(telegram_data, dict) and len(telegram_data) > 0:
-        print("Parsed Data Keys:", telegram_data.keys())
-    else:
-        print("Parsed Data:", telegram_data)
-    
-    # Check if the data is empty
-    if not telegram_data:
-        print("Empty request data received")
-        return Response(
-            {"error": "Empty request data. Make sure the request contains valid JSON."}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # If data is not a dict, try to convert from string
-    if not isinstance(telegram_data, dict):
-        try:
-            print("Attempting to parse non-dict data")
-            import json
-            if isinstance(telegram_data, str):
-                telegram_data = json.loads(telegram_data)
-                print("Successfully converted string to JSON")
-            else:
-                print(f"Unexpected data type: {type(telegram_data)}")
-                return Response(
-                    {"error": f"Unexpected data type: {type(telegram_data)}. Expected JSON object."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        except json.JSONDecodeError as e:
-            print(f"JSON decode error: {str(e)}")
-            return Response(
-                {"error": f"Invalid JSON format: {str(e)}"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except Exception as e:
-            print(f"Error processing request data: {str(e)}")
-            return Response(
-                {"error": f"Error processing request data: {str(e)}"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
     
     # Validate data
     if 'hash' not in telegram_data:
-        print("Hash missing from request data")
         return Response(
             {"error": "Telegram authentication hash is missing"}, 
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Skip validation in development if no bot token is set
+    # Validate hash if bot token is set
     if settings.TELEGRAM_BOT_TOKEN:
         is_valid, message = validate_telegram_data(telegram_data)
         if not is_valid:
-            print(f"Telegram data validation failed: {message}")
             return Response(
                 {"error": message}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-    else:
-        print("TELEGRAM_BOT_TOKEN not set, skipping validation")
     
     telegram_id = telegram_data.get('id')
     if not telegram_id:
-        print("Telegram ID missing from request data")
         return Response(
             {"error": "Telegram ID is missing"}, 
             status=status.HTTP_400_BAD_REQUEST
@@ -176,7 +91,6 @@ def telegram_auth(request):
     try:
         telegram_user = TelegramUser.objects.get(telegram_id=telegram_id)
         user = telegram_user.user
-        print(f"Existing user found: {user.username}")
         
         # Update user data
         telegram_user.username = telegram_data.get('username')
@@ -185,24 +99,20 @@ def telegram_auth(request):
         telegram_user.photo_url = telegram_data.get('photo_url')
         telegram_user.auth_date = telegram_data.get('auth_date')
         telegram_user.save()
-        print("User data updated")
         
     except TelegramUser.DoesNotExist:
         # Create a new user
         username = telegram_data.get('username') or f"tg_{telegram_id}"
-        print(f"Creating new user with username: {username}")
         
         # Make sure username is unique
         if User.objects.filter(username=username).exists():
             username = f"{username}_{telegram_id}"
-            print(f"Username already exists, using {username} instead")
         
         user = User.objects.create_user(
             username=username,
             email='',
             password=None  # We don't need a password for Telegram auth
         )
-        print(f"User created: {user.id}")
         
         # Create TelegramUser
         telegram_user = TelegramUser.objects.create(
@@ -214,14 +124,9 @@ def telegram_auth(request):
             photo_url=telegram_data.get('photo_url'),
             auth_date=telegram_data.get('auth_date')
         )
-        print(f"TelegramUser created: {telegram_user.id}")
     
     # Create or get token
     token, created = Token.objects.get_or_create(user=user)
-    if created:
-        print("New token created")
-    else:
-        print("Using existing token")
     
     # Return user data and token
     serializer = TelegramUserSerializer(telegram_user)
@@ -229,21 +134,17 @@ def telegram_auth(request):
         'token': token.key,
         'user': serializer.data
     }
-    print("Authentication successful, returning token and user data")
     return Response(response_data)
 
 
 # User Profile API
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
 def get_user_profile(request):
-    """
-    Get authenticated user's profile data.
-    
-    Returns:
-        - 200 OK: Returns user profile data
-        - 404 Not Found: User profile not found
-    """
+    """Get authenticated user's profile data."""
+    # Simple authentication check
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+        
     try:
         telegram_user = request.user.telegram_user
         serializer = TelegramUserSerializer(telegram_user)
@@ -257,21 +158,12 @@ def get_user_profile(request):
 
 # User Profile Update API
 @api_view(["PUT"])
-@permission_classes([IsAuthenticated])
 def update_user_profile(request):
-    """
-    Update authenticated user's profile data.
-    
-    Request Body:
-        - first_name (str, optional): User's first name
-        - last_name (str, optional): User's last name
-        - photo_url (str, optional): URL to user's profile photo
+    """Update authenticated user's profile data."""
+    # Simple authentication check
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
         
-    Returns:
-        - 200 OK: Profile updated successfully, returns updated profile data
-        - 400 Bad Request: Invalid data
-        - 404 Not Found: User profile not found
-    """
     try:
         telegram_user = request.user.telegram_user
         serializer = TelegramUserSerializer(
