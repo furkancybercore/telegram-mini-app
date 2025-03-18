@@ -2,11 +2,9 @@
 
 A simple Rock-Paper-Scissors game built as a Telegram Mini App. This project demonstrates how to create a game that can be embedded directly into Telegram chats.
 
-[Telegram Mini App](https://5d8f-203-30-15-108.ngrok-free.app/)
+[Telegram Mini App](https://t.me/RPC_2025_bot/app)
 
-
-![RPC Game Screenshot](![image](https://github.com/user-attachments/assets/5b937a0b-9690-483f-b478-b0b74d5d9ac8))
-
+![RPC Game Screenshot](https://github.com/user-attachments/assets/5b937a0b-9690-483f-b478-b0b74d5d9ac8)
 
 ## 🌟 Project Overview for Beginners
 
@@ -22,6 +20,7 @@ This project is a complete example of a Telegram Mini App - a web application th
 - **Stats Tracking**: Records your wins, losses, and draws
 - **Responsive Design**: Works on both mobile and desktop Telegram
 - **Demo Mode**: Test the app without Telegram integration
+- **Environment Variables**: Configurable settings for different environments
 
 ## 📁 Project Structure Explained
 
@@ -42,6 +41,10 @@ telegram-mini-app/
 │       ├── index.html      # Main HTML structure
 │       ├── styles.css      # CSS styles for UI components
 │       └── app.js          # JavaScript for UI logic
+└── docs/                   # Documentation
+    ├── BackEnd_explanations.md    # Backend code explanations
+    ├── FrontEnd_explanations.md   # Frontend code explanations
+    └── POSTMAN_GUIDE.md           # API testing guide
 ```
 
 ## 🚀 Getting Started for Beginners
@@ -50,13 +53,43 @@ telegram-mini-app/
 
 - Python 3.8 or higher
 - A modern web browser
-- Basic knowledge of command line
+- Git (for cloning the repository)
+- Telegram account (for full testing)
+
+### Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/yourusername/telegram-mini-app.git
+   cd telegram-mini-app
+   ```
+
+2. **Set up the backend**:
+   ```bash
+   cd backend
+   python -m venv venv
+   
+   # On Windows
+   venv\Scripts\activate
+   
+   # On macOS/Linux
+   source venv/bin/activate
+   
+   pip install -r requirements.txt
+   python manage.py migrate
+   ```
+
+3. **Configure your Telegram Bot** (Optional for development):
+   - Create a bot through BotFather (https://t.me/BotFather)
+   - Get your bot token
+   - Add the token to `backend/core/settings.py` as `TELEGRAM_BOT_TOKEN`
 
 ### Running the Project Locally
 
 1. **Start the Backend Server**:
    ```bash
    cd telegram-mini-app/backend
+   source venv/bin/activate  # Or venv\Scripts\activate on Windows
    python manage.py runserver
    ```
    
@@ -70,10 +103,19 @@ telegram-mini-app/
    
    This serves the frontend at http://localhost:8080
 
-3. **Open in Browser**:
+3. **Use the Convenient Scripts** (Alternative method):
+   ```bash
+   # On Windows
+   run.bat
+   
+   # On macOS/Linux
+   ./run.sh
+   ```
+
+4. **Open in Browser**:
    Navigate to http://localhost:8080 in your web browser
 
-4. **Development Mode**:
+5. **Development Mode**:
    Since you're not in Telegram, click "Continue in Demo Mode" to test the app
 
 ## 🔑 How Authentication Works
@@ -93,9 +135,10 @@ The authentication process follows these steps:
    - If valid, it creates or updates the user's account
    - It returns an authentication token for future requests
 
-4. **Demo Mode Alternative**:
-   - For development, "Demo Mode" bypasses Telegram authentication
-   - It uses mock data to simulate a logged-in user
+4. **Security Considerations**:
+   - The validation uses HMAC-SHA256 with the bot token as the secret key
+   - Tokens expire after a period of inactivity
+   - All authentication data is validated for freshness (< 24 hours old)
 
 ## 🎮 How the Game Works
 
@@ -114,6 +157,32 @@ The authentication process follows these steps:
    - Shows who won the round
    - Updates the statistics display
 
+## 🔧 Environment Configuration
+
+The app supports different environments through configuration:
+
+### Backend Configuration
+
+Create a `.env` file in the backend directory with:
+
+```
+DEBUG=True
+SECRET_KEY=your_secret_key
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost:8080
+```
+
+### Frontend Configuration
+
+The frontend can be configured by modifying the constants in `app.js`:
+
+```javascript
+// Edit these values for your setup
+const DEFAULT_PRIMARY_API_URL = 'http://localhost:8000/api';
+const DEFAULT_FALLBACK_API_URL = 'https://your-api-domain.com/api';
+```
+
 ## 🛠️ Common Issues and Solutions
 
 ### Authentication Problems
@@ -128,55 +197,45 @@ The authentication process follows these steps:
 - **Backend errors**: Check the Django server console for error messages
 - **Frontend console errors**: Open browser developer tools (F12) to debug
 
-## 📚 Technical Details for Developers
+## 🔐 Security Considerations
 
-### Frontend Architecture
+- **Bot Token Security**: Keep your bot token secret and never commit it to public repositories
+- **API Access Control**: The API uses token-based authentication for all protected endpoints
+- **Data Validation**: All inputs are validated on both frontend and backend
+- **CORS Protection**: Only allowed origins can access the API in production
+- **HTTPS Required**: In production, always use HTTPS to secure data transmission
+- **Hash Validation**: Telegram authentication includes a hash that must be validated
 
-The app.js file is organized into these main sections:
+## 📚 API Documentation
 
-1. **Initialization**: Sets up the environment and configuration
-2. **Event Listeners**: Handles user interactions
-3. **Authentication**: Manages the Telegram login process
-4. **Game Logic**: Handles game play and updates
-5. **UI Management**: Controls what is shown to the user
+The backend provides these main API endpoints:
 
-### Backend Architecture
+### Authentication
+- `POST /api/auth/telegram/` - Authenticate with Telegram data
+- `GET /api/auth/profile/` - Get authenticated user profile
+- `PUT /api/auth/profile/update/` - Update user profile
 
-The Django backend follows a REST API pattern:
+### Game
+- `POST /api/game/play/` - Play a game with choice
+- `GET /api/game/history/` - Get user's game history
+- `GET /api/game/stats/` - Get user's game statistics
 
-1. **/api/auth/telegram/**: Authenticates users with Telegram data
-2. **/api/game/play/**: Processes game moves
-3. **/api/game/stats/**: Retrieves user statistics
+For detailed API documentation, see the [POSTMAN_GUIDE.md](POSTMAN_GUIDE.md) file.
 
-Each endpoint validates the request, processes the data, and returns a JSON response.
+## 🤝 Contributing
 
-## Recent Updates
+Contributions are welcome! To contribute:
 
-### 1. Fixed Stats Display
-- Improved error handling for stats fetching
-- Added proper validation for missing values
-- Fixed authentication token handling
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-### 2. Enhanced Error Handling
-- Added better error messages for common issues
-- Improved user feedback during errors
-- Fixed issues with error display in the UI
+## 📄 License
 
-### 3. Code Optimization
-- Removed duplicate code
-- Added more comments to explain complex parts
-- Reorganized functions for better readability
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Security Considerations
+## 📞 Contact
 
-- The bot token should be kept secret
-- Telegram authentication includes a hash that should be validated
-- For production, use HTTPS and proper CORS settings
-
-## Contact
-
-If you have any questions or need help, please open an issue in this repository.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 
+If you have any questions or need help, please open an issue in this repository. 

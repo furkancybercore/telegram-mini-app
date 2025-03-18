@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Mini App Authentication Flow</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        header {
+            background: #0088cc;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 20px;
+        }
+        .screen {
+            display: none;
+        }
+        .screen.active {
+            display: block;
+        }
+        .entity {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            position: relative;
+        }
+        .user { background: #ffcc80; }
+        .telegram { background: #81d4fa; }
+        .frontend { background: #a5d6a7; }
+        .backend { background: #ce93d8; }
+        
+        .code-block {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 10px 15px;
+            background: #0088cc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .data-flow {
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .flow-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .flow-arrow {
+            flex-grow: 1;
+            height: 2px;
+            background: #333;
+            position: relative;
+            margin: 0 10px;
+        }
+        
+        .flow-arrow::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: -4px;
+            border-left: 8px solid #333;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+        }
+        
+        .data-box {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+            background: #f9f9f9;
+        }
+        
+        .highlight {
+            background: #fffde7;
+            border-left: 4px solid #fbc02d;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .loading {
+            height: 4px;
+            width: 100%;
+            background: #eee;
+            margin: 10px 0;
+            overflow: hidden;
+            border-radius: 2px;
+        }
+        
+        .loading-bar {
+            height: 100%;
+            width: 0;
+            background: #0088cc;
+            transition: width 0.5s;
+        }
+        
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            background: #0088cc;
+            color: white;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Telegram Mini App Authentication Flow</h1>
+        </header>
+        
+        <div class="content">
+            <!-- Introduction Screen -->
+            <div id="screen-intro" class="screen active">
+                <h2>Understanding Telegram Mini App Authentication</h2>
+                <p>Click the buttons below to walk through the data flow between Users, Telegram, Frontend, and Backend when validating Mini App data.</p>
+                
+                <div class="data-flow">
+                    <div class="entity user">
+                        <strong>User</strong> - Interacts with the Telegram app
+                    </div>
+                    <div class="entity telegram">
+                        <strong>Telegram</strong> - Generates authentication data with hash
+                    </div>
+                    <div class="entity frontend">
+                        <strong>Frontend Developer</strong> - Creates Mini App interface, receives data from Telegram
+                    </div>
+                    <div class="entity backend">
+                        <strong>Backend Developer</strong> - Validates data authenticity and hash
+                    </div>
+                </div>
+                
+                <div class="buttons">
+                    <button id="btn-intro" class="btn">Begin Demo</button>
+                </div>
+            </div>
+            
+            <!-- Step 1: User clicks Mini App link -->
+            <div id="screen-step1" class="screen">
+                <h2><span class="step-number">1</span> User Clicks Telegram Mini App Link</h2>
+                
+                <div class="entity user">
+                    <p>The user clicks on a Telegram Mini App link or button. This can be from:</p>
+                    <ul>
+                        <li>A keyboard button in a chat</li>
+                        <li>An inline button in a message</li>
+                        <li>The bot's menu button</li>
+                        <li>A direct link</li>
+                    </ul>
+                </div>
+                
+                <div class="data-box">
+                    <h3>Simulate Opening a Mini App:</h3>
+                    <button id="open-app-btn" class="btn">Click to Open Mini App</button>
+                    <div id="app-opening" style="display: none; margin-top: 15px;">
+                        <p>Opening the Mini App...</p>
+                        <div class="loading">
+                            <div id="progress-bar" class="loading-bar"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="buttons">
+                    <button id="btn-step1-back" class="btn btn-secondary">Back</button>
+                    <button id="btn-step1-next" class="btn">Next: Telegram Generates Data</button>
+                </div>
+            </div>
+            
+            <!-- Step 2: Telegram generates data -->
+            <div id="screen-step2" class="screen">
+                <h2><span class="step-number">2</span> Telegram Generates Authentication Data</h2>
+                
+                <div class="entity telegram">
+                    <p>Telegram prepares data to send to the Mini App:</p>
+                    <ul>
+                        <li><strong>auth_date</strong>: Timestamp of when the Mini App was opened</li>
+                        <li><strong>user</strong>: Information about the current user (id, name, etc.)</li>
+                        <li><strong>start_param</strong>: Parameters if opened via special link</li>
+                        <li><strong>hash</strong>: A cryptographic hash to verify the data's authenticity</li>
+                    </ul>
+                </div>
+                
+                <div class="highlight">
+                    <h3>How the hash is generated:</h3>
+                    <ol>
+                        <li>Sort all data fields alphabetically</li>
+                        <li>Format as "key=value" pairs separated by newlines</li>
+                        <li>Create secret key using bot token: <code>HMAC-SHA-256(bot_token, "WebAppData")</code></li>
+                        <li>Generate hash: <code>HMAC-SHA-256(data_check_string, secret_key)</code></li>
+                    </ol>
+                </div>
+                
+                <div class="code-block">
+// Example of how Telegram generates the hash
+function generateTelegramHash(data, botToken) {
+    // Create secret key
+    let secretKey = hmacSha256("WebAppData", botToken);
+    
+    // Create data-check-string
+    let dataCheckArr = [];
+    for (let key in data) {
+        if (key !== 'hash') {
+            dataCheckArr.push(key + '=' + data[key]);
+        }
+    }
+    let dataCheckString = dataCheckArr.sort().join('\n');
+    
+    // Generate the hash
+    return hmacSha256(dataCheckString, secretKey);
+}</div>
+                
+                <div class="buttons">
+                    <button id="btn-step2-back" class="btn btn-secondary">Back</button>
+                    <button id="btn-step2-next" class="btn">Next: Frontend Receives Data</button>
+                </div>
+            </div>
+            
+            <!-- Step 3: Frontend receives data -->
+            <div id="screen-step3" class="screen">
+                <h2><span class="step-number">3</span> Frontend Receives the Data</h2>
+                
+                <div class="entity frontend">
+                    <p>The Mini App loads in Telegram's WebView and receives the initialization data:</p>
+                    <ul>
+                        <li>Mini App includes the Telegram Web App script: <code>&lt;script src="https://telegram.org/js/telegram-web-app.js"&gt;&lt;/script&gt;</code></li>
+                        <li>The script makes the <code>Telegram.WebApp</code> object available</li>
+                        <li>Data is accessible via <code>Telegram.WebApp.initData</code> (raw string) and <code>Telegram.WebApp.initDataUnsafe</code> (parsed object)</li>
+                    </ul>
+                </div>
+                
+                <div class="code-block">
+// In the Mini App's JavaScript
+const initDataRaw = Telegram.WebApp.initData;
+// "auth_date=1682527600&user=%7B%22id%22%3A123456789%7D&hash=abc123..."
+
+// The parsed data object (CAUTION: NOT SECURE FOR CRITICAL OPERATIONS)
+const initDataObject = Telegram.WebApp.initDataUnsafe;
+// { auth_date: 1682527600, user: { id: 123456789, ... }, hash: "abc123..." }
+
+// Pass the raw initData to backend for validation
+fetch('https://your-api.com/validate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData: initDataRaw })
+});</div>
+                
+                <div class="highlight">
+                    <h3>Security Warning:</h3>
+                    <p>The frontend should never trust <code>initDataUnsafe</code> for security-critical operations!</p>
+                    <p>Client-side data can be manipulated - always validate on the server.</p>
+                </div>
+                
+                <div class="buttons">
+                    <button id="btn-step3-back" class="btn btn-secondary">Back</button>
+                    <button id="btn-step3-next" class="btn">Next: Backend Validates Data</button>
+                </div>
+            </div>
+            
+            <!-- Step 4: Backend validation -->
+            <div id="screen-step4" class="screen">
+                <h2><span class="step-number">4</span> Backend Validates the Data</h2>
+                
+                <div class="entity backend">
+                    <p>The backend receives the raw data and validates it:</p>
+                    <ol>
+                        <li>Parse the raw initialization data</li>
+                        <li>Extract the received hash value</li>
+                        <li>Create a secret key using the bot token</li>
+                        <li>Create a data-check-string (same way Telegram did)</li>
+                        <li>Calculate the expected hash</li>
+                        <li>Compare the received hash with the expected hash</li>
+                    </ol>
+                </div>
+                
+                <div class="code-block">
+// Backend validation example (Node.js)
+const crypto = require('crypto');
+
+function validateTelegramData(initData, botToken) {
+    // Parse initData
+    const data = new URLSearchParams(initData);
+    const receivedHash = data.get('hash');
+    data.delete('hash');
+    
+    // Create data check string
+    const dataCheckArr = [];
+    for (const [key, value] of data.entries()) {
+        dataCheckArr.push(`${key}=${value}`);
+    }
+    const dataCheckString = dataCheckArr.sort().join('\n');
+    
+    // Create secret key
+    const secretKey = crypto
+        .createHmac('sha256', 'WebAppData')
+        .update(botToken)
+        .digest();
+    
+    // Calculate hash
+    const expectedHash = crypto
+        .createHmac('sha256', secretKey)
+        .update(dataCheckString)
+        .digest('hex');
+    
+    // Compare hashes
+    return receivedHash === expectedHash;
+}</div>
+                
+                <div class="data-box">
+                    <h3>Try the Validation Logic:</h3>
+                    <button id="validate-btn" class="btn">Run Validation</button>
+                    <div id="validation-result" style="display: none; margin-top: 15px;"></div>
+                </div>
+                
+                <div class="buttons">
+                    <button id="btn-step4-back" class="btn btn-secondary">Back</button>
+                    <button id="btn-step4-next" class="btn">Next: Complete Flow</button>
+                </div>
+            </div>
+            
+            <!-- Step 5: Complete flow -->
+            <div id="screen-step5" class="screen">
+                <h2><span class="step-number">5</span> Complete Authentication Flow</h2>
+                
+                <p>Here's the complete data flow between all parties:</p>
+                
+                <div class="data-flow">
+                    <div class="flow-item">
+                        <div class="entity user" style="flex: 0 0 200px;">User</div>
+                        <div class="flow-arrow"></div>
+                        <div class="entity telegram" style="flex: 0 0 200px;">Telegram</div>
+                    </div>
+                    <p style="text-align: center;">1. User clicks on Mini App link</p>
+                    
+                    <div class="flow-item">
+                        <div class="entity telegram" style="flex: 0 0 200px;">Telegram</div>
+                        <div class="flow-arrow"></div>
+                        <div class="entity frontend" style="flex: 0 0 200px;">Frontend</div>
+                    </div>
+                    <p style="text-align: center;">2. Telegram passes initData with hash</p>
+                    
+                    <div class="flow-item">
+                        <div class="entity frontend" style="flex: 0 0 200px;">Frontend</div>
+                        <div class="flow-arrow"></div>
+                        <div class="entity backend" style="flex: 0 0 200px;">Backend</div>
+                    </div>
+                    <p style="text-align: center;">3. Frontend sends raw initData to backend</p>
+                    
+                    <div class="flow-item">
+                        <div class="entity backend" style="flex: 0 0 200px;">Backend</div>
+                        <div class="flow-arrow" style="transform: rotate(180deg);"></div>
+                        <div class="entity frontend" style="flex: 0 0 200px;">Frontend</div>
+                    </div>
+                    <p style="text-align: center;">4. Backend validates and returns result</p>
+                </div>
+                
+                <div class="highlight">
+                    <h3>Important Security Points:</h3>
+                    <ul>
+                        <li><strong>Never expose the bot token</strong> in the frontend</li>
+                        <li><strong>Always validate data on the server</strong> before trusting it</li>
+                        <li><strong>Check the auth_date</strong> to prevent replay attacks</li>
+                        <li><strong>Use HTTPS</strong> for all API communication</li>
+                    </ul>
+                </div>
+                
+                <div class="data-box">
+                    <h3>Run Full Flow Simulation:</h3>
+                    <button id="simulate-flow-btn" class="btn">Start Simulation</button>
+                    <div id="flow-simulation" style="display: none; margin-top: 15px;">
+                        <div id="simulation-step" class="simulation-step"></div>
+                        <div class="code-block" id="simulation-code" style="margin-top: 10px; font-size: 13px;"></div>
+                        <div class="loading" style="margin-top: 10px;">
+                            <div id="simulation-progress" class="loading-bar"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="buttons">
+                    <button id="btn-step5-back" class="btn btn-secondary">Back</button>
+                    <button id="btn-restart" class="btn">Restart Demo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Screen navigation
+            const screens = [
+                'screen-intro',
+                'screen-step1',
+                'screen-step2',
+                'screen-step3',
+                'screen-step4',
+                'screen-step5'
+            ];
+            
+            function showScreen(screenId) {
+                // Hide all screens
+                screens.forEach(id => {
+                    document.getElementById(id).classList.remove('active');
+                });
+                
+                // Show requested screen
+                document.getElementById(screenId).classList.add('active');
+            }
+            
+            // Button click handlers
+            document.getElementById('btn-intro').addEventListener('click', () => {
+                showScreen('screen-step1');
+            });
+            
+            document.getElementById('btn-step1-back').addEventListener('click', () => {
+                showScreen('screen-intro');
+            });
+            
+            document.getElementById('btn-step1-next').addEventListener('click', () => {
+                showScreen('screen-step2');
+            });
+            
+            document.getElementById('btn-step2-back').addEventListener('click', () => {
+                showScreen('screen-step1');
+            });
+            
+            document.getElementById('btn-step2-next').addEventListener('click', () => {
+                showScreen('screen-step3');
+            });
+            
+            document.getElementById('btn-step3-back').addEventListener('click', () => {
+                showScreen('screen-step2');
+            });
+            
+            document.getElementById('btn-step3-next').addEventListener('click', () => {
+                showScreen('screen-step4');
+            });
+            
+            document.getElementById('btn-step4-back').addEventListener('click', () => {
+                showScreen('screen-step3');
+            });
+            
+            document.getElementById('btn-step4-next').addEventListener('click', () => {
+                showScreen('screen-step5');
+            });
+            
+            document.getElementById('btn-step5-back').addEventListener('click', () => {
+                showScreen('screen-step4');
+            });
+            
+            document.getElementById('btn-restart').addEventListener('click', () => {
+                showScreen('screen-intro');
+            });
+            
+            // "Open Mini App" button functionality
+            const openAppBtn = document.getElementById('open-app-btn');
+            const appOpening = document.getElementById('app-opening');
+            const progressBar = document.getElementById('progress-bar');
+            
+            openAppBtn.addEventListener('click', function() {
+                appOpening.style.display = 'block';
+                openAppBtn.disabled = true;
+                
+                // Animate progress bar
+                setTimeout(() => {
+                    progressBar.style.width = '100%';
+                }, 50);
+                
+                // After animation completes, go to next screen
+                setTimeout(() => {
+                    showScreen('screen-step2');
+                    openAppBtn.disabled = false;
+                    appOpening.style.display = 'none';
+                    progressBar.style.width = '0';
+                }, 1500);
+            });
+            
+            // Validation button functionality
+            const validateBtn = document.getElementById('validate-btn');
+            const validationResult = document.getElementById('validation-result');
+            
+            validateBtn.addEventListener('click', function() {
+                validationResult.style.display = 'block';
+                validateBtn.disabled = true;
+                
+                // Show validating message
+                validationResult.innerHTML = '<p>Validating data...</p>';
+                
+                // Simulate validation process
+                setTimeout(() => {
+                    validationResult.innerHTML = `
+                        <p style="color: green;">✓ Validation successful! Hash matches.</p>
+                        <p>Data is authentic and comes from Telegram.</p>
+                        <p>User ID: 123456789</p>
+                        <p>Username: johndoe</p>
+                    `;
+                    validateBtn.disabled = false;
+                }, 1500);
+            });
+            
+            // Flow simulation
+            const simulateFlowBtn = document.getElementById('simulate-flow-btn');
+            const flowSimulation = document.getElementById('flow-simulation');
+            const simulationStep = document.getElementById('simulation-step');
+            const simulationCode = document.getElementById('simulation-code');
+            const simulationProgress = document.getElementById('simulation-progress');
+            
+            const simulationSteps = [
+                {
+                    text: "1. User clicks Mini App link in Telegram...",
+                    code: ""
+                },
+                {
+                    text: "2. Telegram generates the initialization data with hash...",
+                    code: `// Telegram generates this data
+{
+  "auth_date": 1682527600,
+  "user": {"id": 123456789, "first_name": "John"},
+  "hash": "7c90ae9eefba4c1c42ec9e37cd495e56ed1bbef4b5251a6def89a0444f22a93d"
+}`
+                },
+                {
+                    text: "3. Mini App frontend receives the data...",
+                    code: `// In the Mini App JavaScript
+const initData = Telegram.WebApp.initData;
+// "auth_date=1682527600&user=%7B%22id%22%3A123456789%7D&hash=7c90..."
+
+// Send to backend for validation
+fetch('/api/validate', {
+  method: 'POST',
+  body: JSON.stringify({ initData })
+});`
+                },
+                {
+                    text: "4. Backend validates the data by recreating the hash...",
+                    code: `// In the backend (Node.js)
+function validateData(initData, botToken) {
+  const data = new URLSearchParams(initData);
+  const receivedHash = data.get('hash');
+  data.delete('hash');
+  
+  // Create data-check-string
+  const dataCheckArr = [];
+  for (const [key, value] of data.entries()) {
+    dataCheckArr.push(\`\${key}=\${value}\`);
+  }
+  const dataCheckString = dataCheckArr.sort().join('\\n');
+  
+  // Create secret key using bot token
+  const secretKey = crypto
+    .createHmac('sha256', 'WebAppData')
+    .update(botToken)
+    .digest();
+    
+  // Calculate expected hash
+  const expectedHash = crypto
+    .createHmac('sha256', secretKey)
+    .update(dataCheckString)
+    .digest('hex');
+    
+  // Compare hashes
+  return receivedHash === expectedHash;
+}`
+                },
+                {
+                    text: "5. Backend returns validation result to frontend...",
+                    code: `// Response from backend
+{
+  "success": true,
+  "valid": true,
+  "userData": {
+    "id": 123456789,
+    "first_name": "John"
+  }
+}`
+                },
+                {
+                    text: "Flow Complete! The Mini App can now safely proceed with the authenticated user.",
+                    code: ""
+                }
+            ];
+            
+            simulateFlowBtn.addEventListener('click', function() {
+                flowSimulation.style.display = 'block';
+                simulateFlowBtn.disabled = true;
+                
+                let currentStepIndex = 0;
+                simulationStep.textContent = simulationSteps[currentStepIndex].text;
+                simulationCode.textContent = simulationSteps[currentStepIndex].code;
+                
+                function nextStep() {
+                    if (currentStepIndex < simulationSteps.length - 1) {
+                        currentStepIndex++;
+                        simulationProgress.style.width = '0';
+                        
+                        setTimeout(() => {
+                            simulationStep.textContent = simulationSteps[currentStepIndex].text;
+                            simulationCode.textContent = simulationSteps[currentStepIndex].code;
+                            simulationProgress.style.width = '100%';
+                            
+                            if (currentStepIndex < simulationSteps.length - 1) {
+                                setTimeout(nextStep, 3000);
+                            } else {
+                                simulateFlowBtn.disabled = false;
+                                simulateFlowBtn.textContent = 'Restart Simulation';
+                            }
+                        }, 500);
+                    }
+                }
+                
+                // Start the simulation
+                simulationProgress.style.width = '100%';
+                
+                if (simulateFlowBtn.textContent === 'Restart Simulation') {
+                    currentStepIndex = 0;
+                    simulationStep.textContent = simulationSteps[currentStepIndex].text;
+                    simulationCode.textContent = simulationSteps[currentStepIndex].code;
+                    simulateFlowBtn.textContent = 'Start Simulation';
+                }
+                
+                setTimeout(nextStep, 2000);
+            });
+        });
+    </script>
+</body>
+</html>
