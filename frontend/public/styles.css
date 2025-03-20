@@ -614,12 +614,14 @@ h3 {
     color: var(--tg-theme-button-color);
 }
 
-/* Profile Section */
+/* Profile Section - More compact for Telegram Mini App */
 .profile-container {
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
+    max-height: 620px; /* Control height for 700px screens */
+    overflow-y: auto;
 }
 
 .profile-header {
@@ -627,20 +629,20 @@ h3 {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 30px;
+    margin-bottom: 15px;
 }
 
 .profile-avatar-container {
     position: relative;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
 }
 
 #profile-photo {
-    width: 120px;
-    height: 120px;
+    width: 90px;
+    height: 90px;
     border-radius: 50%;
     object-fit: cover;
-    border: 4px solid var(--tg-theme-button-color);
+    border: 3px solid var(--tg-theme-button-color);
     box-shadow: var(--card-shadow);
 }
 
@@ -650,8 +652,8 @@ h3 {
     right: 0;
     background-color: var(--tg-theme-button-color);
     color: var(--tg-theme-button-text-color);
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
@@ -660,17 +662,26 @@ h3 {
     box-shadow: var(--card-shadow);
 }
 
+.profile-photo-edit i {
+    font-size: 14px;
+}
+
+.profile-title {
+    font-size: 18px;
+    margin-bottom: 2px;
+}
+
 .profile-username {
     color: var(--tg-theme-hint-color);
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .profile-details {
     width: 100%;
     background-color: rgba(0, 0, 0, 0.02);
     border-radius: var(--border-radius);
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 15px;
+    margin-bottom: 15px;
     box-shadow: var(--card-shadow);
 }
 
@@ -679,22 +690,23 @@ h3 {
 }
 
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 .form-group label {
     display: block;
     font-weight: 500;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     color: var(--tg-theme-text-color);
+    font-size: 14px;
 }
 
 .form-input {
     width: 100%;
-    padding: 12px 15px;
+    padding: 10px 12px;
     border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 8px;
-    font-size: 16px;
+    font-size: 14px;
     background-color: var(--tg-theme-bg-color);
     color: var(--tg-theme-text-color);
     transition: border-color 0.3s;
@@ -705,41 +717,56 @@ h3 {
     border-color: var(--tg-theme-button-color);
 }
 
-.theme-toggle {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.theme-button {
-    flex: 1;
-    padding: 10px;
-    background-color: rgba(0, 0, 0, 0.03);
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: pointer;
-    min-width: 80px;
-}
-
-.theme-button i {
-    font-size: 24px;
-    margin-bottom: 5px;
-}
-
-.theme-button.active {
-    background-color: var(--tg-theme-button-color);
-    color: var(--tg-theme-button-text-color);
-    border-color: var(--tg-theme-button-color);
-}
-
 .account-actions {
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 10px;
+}
+
+/* Profile Status Message */
+.profile-status {
+    padding: 10px;
+    border-radius: var(--border-radius);
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 13px;
+}
+
+.profile-status.success {
+    background-color: rgba(76, 175, 80, 0.1);
+    border-left: 3px solid var(--win-color);
+}
+
+.profile-status.error {
+    background-color: rgba(244, 67, 54, 0.1);
+    border-left: 3px solid var(--lose-color);
+}
+
+/* Media Queries for height constraints */
+@media (max-height: 700px) {
+    .profile-container {
+        max-height: 580px;
+    }
+    
+    .profile-avatar-container {
+        margin-bottom: 5px;
+    }
+    
+    #profile-photo {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .profile-details {
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+    
+    .form-group {
+        margin-bottom: 12px;
+    }
 }
 
 /* Leaderboard Section */

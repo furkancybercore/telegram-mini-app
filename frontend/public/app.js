@@ -55,6 +55,8 @@ const winRateElement = document.getElementById('win-rate');
 const profilePhoto = document.getElementById('profile-photo');
 const profileName = document.getElementById('profile-name');
 const profileUsername = document.getElementById('profile-username');
+const profilePhotoEdit = document.querySelector('.profile-photo-edit');
+const profilePhotoInput = document.getElementById('profile-photo-input');
 const displayNameInput = document.getElementById('display-name');
 const emailInput = document.getElementById('email');
 const themeButtons = document.querySelectorAll('.theme-button');
@@ -69,6 +71,7 @@ const navItems = document.querySelectorAll('.nav-item');
 let token = localStorage.getItem('token');
 let userData = JSON.parse(localStorage.getItem('userData') || '{}');
 let currentSection = 'game-section';
+let selectedProfilePhoto = null;
 
 // Initialize the app when the DOM is fully loaded
 window.addEventListener('DOMContentLoaded', function() {
@@ -95,6 +98,16 @@ window.addEventListener('DOMContentLoaded', function() {
     saveProfileButton.addEventListener('click', saveProfile);
     logoutButton.addEventListener('click', handleLogout);
     deleteAccountButton.addEventListener('click', handleDeleteAccount);
+    
+    // Profile photo edit button
+    if (profilePhotoEdit) {
+        profilePhotoEdit.addEventListener('click', openProfilePhotoSelector);
+    }
+    
+    // Profile photo input change
+    if (profilePhotoInput) {
+        profilePhotoInput.addEventListener('change', handleProfilePhotoChange);
+    }
     
     navItems.forEach(item => {
         item.addEventListener('click', () => navigateTo(item.dataset.target));
@@ -260,6 +273,9 @@ function showAuthenticatedUI() {
     navbar.classList.remove('hidden');
 }
 
+/**
+ * Updates the UI with all user information
+ */
 function updateAllUserInfo() {
     // Update game section
     if (userData) {
@@ -272,9 +288,9 @@ function updateAllUserInfo() {
     profileName.textContent = `${userData.first_name || ''} ${userData.last_name || ''}`.trim();
     profileUsername.textContent = userData.username ? `@${userData.username}` : '';
     
-    // Prefill profile form
-    displayNameInput.value = userData.display_name || `${userData.first_name || ''} ${userData.last_name || ''}`.trim();
-    emailInput.value = userData.email || '';
+    // Prefill profile form with actual first_name and last_name
+    document.getElementById('first-name').value = userData.first_name || '';
+    document.getElementById('last-name').value = userData.last_name || '';
 }
 
 /**
@@ -463,27 +479,242 @@ function handleThemeChange(themeId) {
     console.log(`Theme changed to ${theme}`);
 }
 
+/**
+ * Opens the file selector dialog for profile photo
+ */
+function openProfilePhotoSelector() {
+    // Check if running in Telegram Mini App
+    if (window.Telegram && window.Telegram.WebApp) {
+        // First try to use Telegram's native photo selector if available
+        if (tg.showPopup) {
+            tg.showPopup({
+                title: 'Select Photo Option',
+                message: 'How would you like to update your profile photo?',
+                buttons: [
+                    {id: 'file', type: 'default', text: 'Select from Device'},
+                    {id: 'camera', type: 'default', text: 'Take Photo'},
+                    {id: 'cancel', type: 'cancel', text: 'Cancel'}
+                ]
+            }, function(buttonId) {
+                if (buttonId === 'file') {
+                    // Create and trigger a hidden file input
+                    createAndTriggerFileInput();
+                } else if (buttonId === 'camera') {
+                    // Not all devices support camera directly, but we can try
+                    createAndTriggerFileInput(true);
+                }
+            });
+        } else {
+            // Fall back to standard file input if popup not available
+            createAndTriggerFileInput();
+        }
+    } else {
+        // Regular web environment
+        createAndTriggerFileInput();
+    }
+}
+
+/**
+ * Creates and triggers a file input element
+ * @param {boolean} camera - Whether to open the camera
+ */
+function createAndTriggerFileInput(camera = false) {
+    // Check if there's already a file input
+    let fileInput = document.getElementById('profile-photo-input');
+    
+    if (!fileInput) {
+        // Create a file input if it doesn't exist
+        fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.id = 'profile-photo-input';
+        fileInput.accept = 'image/*';
+        fileInput.style.position = 'absolute';
+        fileInput.style.visibility = 'hidden';
+        fileInput.style.pointerEvents = 'none';
+        document.body.appendChild(fileInput);
+        
+        // Add change event listener
+        fileInput.addEventListener('change', handleProfilePhotoChange);
+    }
+    
+    // Open camera if requested and supported
+    if (camera) {
+        fileInput.setAttribute('capture', 'user');
+    } else {
+        fileInput.removeAttribute('capture');
+    }
+    
+    // Trigger click
+    fileInput.click();
+}
+
+/**
+ * Handles the selected profile photo
+ * @param {Event} event - The change event
+ */
+function handleProfilePhotoChange(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.match('image.*')) {
+        showProfileUpdateStatus('Please select an image file (JPEG, PNG, etc.)', false);
+        return;
+    }
+    
+    // Check file size (limit to 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    if (file.size > maxSize) {
+        showProfileUpdateStatus('Image is too large. Please select an image smaller than 5MB.', false);
+        return;
+    }
+    
+    // Store the selected file for upload
+    selectedProfilePhoto = file;
+    
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        // Update the profile photo with the selected image preview
+        profilePhoto.src = e.target.result;
+        
+        // Show a badge or indicator that changes are not saved
+        showProfileUpdateStatus('Photo selected. Click "Save Changes" to update your profile.', true, 'info');
+    };
+    reader.readAsDataURL(file);
+}
+
+/**
+ * Shows a status message in the profile section
+ * @param {string} message - The message to display
+ * @param {boolean} isSuccess - Whether it's a success message
+ * @param {string} type - The type of message ('success', 'error', 'info')
+ */
+function showProfileUpdateStatus(message, isSuccess = true, type = null) {
+    const profileStatus = document.getElementById('profile-status');
+    const profileStatusMessage = profileStatus.querySelector('.profile-status-message');
+    
+    // Remove all classes first
+    profileStatus.classList.remove('hidden', 'success', 'error', 'info');
+    
+    // Add appropriate class
+    if (type) {
+        profileStatus.classList.add(type);
+    } else {
+        profileStatus.classList.add(isSuccess ? 'success' : 'error');
+    }
+    
+    profileStatusMessage.textContent = message;
+    
+    // Auto-hide after a delay unless it's an info message
+    if (type !== 'info') {
+        setTimeout(() => {
+            profileStatus.classList.add('hidden');
+        }, 3000);
+    }
+}
+
+/**
+ * Saves profile changes to the backend API
+ */
 async function saveProfile() {
+    // Show loading indicator or disable button
+    saveProfileButton.disabled = true;
+    saveProfileButton.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin-right:8px;"></div> Saving...';
+    
+    // Get the profile status element
+    const profileStatus = document.getElementById('profile-status');
+    const profileStatusMessage = profileStatus.querySelector('.profile-status-message');
+    
     try {
-        // In a real app, we would send this data to the backend
+        // Make sure we have a token
+        if (!token) {
+            throw new Error('You must be logged in to update your profile');
+        }
+        
+        // Get updated profile information from the form
         const updatedProfile = {
-            display_name: displayNameInput.value,
-            email: emailInput.value
+            first_name: document.getElementById('first-name').value,
+            last_name: document.getElementById('last-name').value
         };
         
-        // Update local userData
-        userData = {
-            ...userData,
-            ...updatedProfile
-        };
+        // Format update profile endpoint URL
+        const updateProfileEndpoint = `${API_URL}/api/auth/profile/update/`;
         
-        // Save to localStorage
-        localStorage.setItem('userData', JSON.stringify(userData));
+        // If we have a new profile photo to upload
+        if (selectedProfilePhoto) {
+            // Create FormData to handle file upload
+            const formData = new FormData();
+            formData.append('photo', selectedProfilePhoto);
+            formData.append('first_name', updatedProfile.first_name);
+            formData.append('last_name', updatedProfile.last_name);
+            
+            // Make API call to upload photo and update profile
+            const response = await fetch(updateProfileEndpoint, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    // Don't set Content-Type here - FormData will set it correctly with the boundary
+                },
+                body: formData
+            });
+            
+            // Handle response
+            if (!response.ok) {
+                throw new Error(`Failed to update profile: ${response.status} ${response.statusText}`);
+            }
+            
+            // Parse response data
+            const data = await response.json();
+            
+            // Update userData with the updated profile
+            userData = data;
+            localStorage.setItem('userData', JSON.stringify(userData));
+            
+            // Clear the selected photo since it's been uploaded
+            selectedProfilePhoto = null;
+            
+            // Show success message
+            showProfileUpdateStatus('Profile and photo updated successfully!', true);
+        } else {
+            // Just update profile without photo
+            const response = await fetch(updateProfileEndpoint, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Token ${token}`,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(updatedProfile)
+            });
+            
+            // Handle response
+            if (!response.ok) {
+                throw new Error(`Failed to update profile: ${response.status} ${response.statusText}`);
+            }
+            
+            // Parse response data
+            const data = await response.json();
+            
+            // Update userData with the updated profile
+            userData = data;
+            localStorage.setItem('userData', JSON.stringify(userData));
+            
+            // Show success message
+            showProfileUpdateStatus('Profile updated successfully!', true);
+        }
         
-        // Show success message
-        alert('Profile updated successfully!');
+        // Update UI with new data
+        updateAllUserInfo();
+        
     } catch (error) {
-        alert('Failed to update profile. Please try again.');
+        // Show error message
+        showProfileUpdateStatus(error.message || 'Failed to update profile. Please try again.', false);
+        console.error('Error updating profile:', error);
+    } finally {
+        // Re-enable save button
+        saveProfileButton.disabled = false;
+        saveProfileButton.innerHTML = '<span class="button-icon">💾</span>Save Changes';
     }
 }
 

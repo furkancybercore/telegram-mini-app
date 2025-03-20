@@ -162,9 +162,9 @@
             </div>
         </div>
 
-        <!-- Profile Section -->
+        <!-- Profile Section - Optimized for 420x700 -->
         <div id="profile-section" class="section hidden">
-            <header class="section-header">
+            <header class="game-header">
                 <h1>Your Profile</h1>
             </header>
             
@@ -176,40 +176,26 @@
                             <i class="fas fa-camera"></i>
                         </div>
                     </div>
-                    <h2 id="profile-name">Loading...</h2>
+                    <h2 id="profile-name" class="profile-title">Loading...</h2>
                     <p id="profile-username" class="profile-username">@username</p>
                 </div>
                 
                 <div class="profile-details">
-                    <h3 class="section-title">Your Information</h3>
+                    <h3 class="section-title">Edit Your Profile</h3>
                     
                     <div class="profile-form">
                         <div class="form-group">
-                            <label for="display-name">Display Name</label>
-                            <input type="text" id="display-name" class="form-input" placeholder="Your display name">
+                            <label for="first-name">First Name</label>
+                            <input type="text" id="first-name" class="form-input" placeholder="Your first name">
                         </div>
                         
                         <div class="form-group">
-                            <label for="email">Email (optional)</label>
-                            <input type="email" id="email" class="form-input" placeholder="Your email address">
+                            <label for="last-name">Last Name</label>
+                            <input type="text" id="last-name" class="form-input" placeholder="Your last name">
                         </div>
                         
-                        <div class="form-group">
-                            <label>Theme Preference</label>
-                            <div class="theme-toggle">
-                                <button id="light-theme" class="theme-button active">
-                                    <i class="fas fa-sun"></i>
-                                    Light
-                                </button>
-                                <button id="dark-theme" class="theme-button">
-                                    <i class="fas fa-moon"></i>
-                                    Dark
-                                </button>
-                                <button id="system-theme" class="theme-button">
-                                    <i class="fas fa-laptop"></i>
-                                    System
-                                </button>
-                            </div>
+                        <div id="profile-status" class="profile-status hidden">
+                            <p class="profile-status-message"></p>
                         </div>
                         
                         <button id="save-profile" class="button">
