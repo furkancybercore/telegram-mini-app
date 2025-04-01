@@ -10,7 +10,13 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+import os
+import dj_database_url
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +26,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-ej*+1wh*0+0=twuj*a+3ji+e$mn20#^#8dp0lip#j@92^ndztl'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-ej*+1wh*0+0=twuj*a+3ji+e$mn20#^#8dp0lip#j@92^ndztl')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['*']  # Allow all hosts for development
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 
 # Application definition
@@ -42,6 +48,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',  # Add token authentication
     'corsheaders',
+    'whitenoise.runserver_nostatic',  # Add WhiteNoise for static files
     
     # Local apps
     'telegram_auth',
@@ -50,6 +57,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # WhiteNoise middleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # Add CORS middleware
     'django.middleware.common.CommonMiddleware',
@@ -60,7 +68,10 @@ MIDDLEWARE = [
 ]
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # For development only; restrict in production
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'https://t.me').split(',')
 
 ROOT_URLCONF = 'core.urls'
 
@@ -92,6 +103,16 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# Use DATABASE_URL environment variable for database configuration if available
+# This is used by Render for PostgreSQL
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES['default'] = dj_database_url.config(
+        default=DATABASE_URL,
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 
 
 # Password validation
@@ -128,7 +149,14 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Extra places for collectstatic to find static files
+STATICFILES_DIRS = []
+
+# WhiteNoise configuration
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -147,7 +175,5 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
 }
 
-# Telegram Bot settings (to be filled by user)
-# This should be the token for RPC_2025_bot
-# For local development, we'll skip validation so this doesn't need to be correct
-TELEGRAM_BOT_TOKEN = ''  # Empty for development to skip validation
+# Telegram Bot settings
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')  # Empty for development to skip validation
