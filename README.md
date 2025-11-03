@@ -1,4 +1,4 @@
-# Rock-Paper-Scissors Telegram Mini App
+# Rock-Paper-Scissors Telegram Mini App (test)
 
 A simple Rock-Paper-Scissors game built as a Telegram Mini App. This project demonstrates how to create a game that can be embedded directly into Telegram chats.
 
